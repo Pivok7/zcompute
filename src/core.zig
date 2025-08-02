@@ -105,6 +105,14 @@ pub const VulkanApp = struct {
         data: []const SharedMemory,
         dispatch: Dispatch,
     ) !Self {
+        std.fs.cwd().access(shader_path, .{}) catch |e| switch (e) {
+            error.FileNotFound => {
+                std.log.err("File: {s} not found\n", .{shader_path});
+                return error.FileNotFound;
+            },
+            else => return e,
+        };
+
         var app = VulkanApp{
             .allocator = allocator,
             .debug_mode = options.debug_mode,
