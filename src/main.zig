@@ -15,14 +15,14 @@ pub fn main() !void {
 
     const data = &[_]SharedMemory{
         try SharedMemory.newSlice(&[_]u32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}),
-        try SharedMemory.newSlice(&[_]u32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}),
+        try SharedMemory.newSlice(&[_]f32{0, 1.1, 2, 3, 4, 5, 6, 7.7, 8, 9}),
     };
     const dispatch = zcomp.Dispatch{ .x = 10, .y = 1, .z = 1 };
 
     var app = try zcomp.App.init(
         allocator,
         .{
-            .debug_mode = true,
+            .debug_mode = debug_mode,
             .enable_validation_layers = debug_mode,
         },
         "src/shaders/square.spv",
@@ -33,16 +33,14 @@ pub fn main() !void {
 
     try app.run();
 
-    std.debug.print("---------->\n", .{});
+    std.debug.print("Output:\n", .{});
 
     const one = try app.getDataAlloc(allocator, 0, u32);
     defer allocator.free(one);
 
-    const two = try app.getDataAlloc(allocator, 1, u32);
+    const two = try app.getDataAlloc(allocator, 1, f32);
     defer allocator.free(two);
 
     std.debug.print("{d}\n", .{one});
     std.debug.print("{d}\n", .{two});
-
-    std.debug.print("---------->\n", .{});
 }

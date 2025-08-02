@@ -2,16 +2,16 @@
 layout(local_size_x = 1, local_size_y = 1) in;
 
 layout(std430, binding = 0) buffer lay0 {
-    int buf_one[];
+    uint buf_one[];
 };
 
 layout(std430, binding = 1) buffer lay1 {
-    int buf_two[];
+    float buf_two[];
 };
 
 void main() {
     const uint id = gl_GlobalInvocationID.x;
 
-    buf_one[id] = buf_one[id] + buf_one[id];
+    buf_one[id] = buf_one[id] * buf_one[id];
     buf_two[id] = buf_two[id] * buf_two[id];
 }

@@ -1,6 +1,7 @@
 const std = @import("std");
 const vk = @import("vulkan");
 const vk_ctx = @import("vk_context.zig");
+const glfw = @import("zglfw");
 const misc = @import("misc.zig");
 const core = @import("core.zig");
 
@@ -11,6 +12,17 @@ const DeviceDispatch = vk_ctx.DeviceDispatch;
 
 const validation_layers = misc.validation_layers;
 const VulkanApp = core.VulkanApp;
+
+pub fn getRequiredExtensions(app: *const VulkanApp) ![][*:0]const u8 {
+    var glfw_extensions: [][*:0]const u8 = undefined;
+    glfw_extensions = try glfw.getRequiredInstanceExtensions();
+
+    var extensions = std.ArrayList([*:0]const u8).init(app.allocator);
+    try extensions.appendSlice(glfw_extensions);
+    try extensions.append(vk.extensions.ext_debug_utils.name);
+
+    return try extensions.toOwnedSlice();
+}
 
 pub fn createInstance(app: *const VulkanApp) !vk.Instance {
     if (app.enable_validation_layers) {
@@ -30,8 +42,8 @@ pub fn createInstance(app: *const VulkanApp) !vk.Instance {
         .p_application_info = &app_info,
         .enabled_layer_count = if (app.enable_validation_layers) @intCast(validation_layers.len) else 0,
         .pp_enabled_layer_names = if (app.enable_validation_layers) @ptrCast(&validation_layers) else null,
-        .enabled_extension_count = @intCast(app.instance_extensions.items.len),
-        .pp_enabled_extension_names = app.instance_extensions.items.ptr,
+        .enabled_extension_count = @intCast(app.instance_extensions.len),
+        .pp_enabled_extension_names = app.instance_extensions.ptr,
     };
 
     return try app.vkb.createInstance(&create_info, null);
