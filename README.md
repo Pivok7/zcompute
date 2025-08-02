@@ -28,15 +28,15 @@ exe.root_module.addImport("zcompute", zcompute_dep.module("zcompute"));
 
 Example usage:
 ```zig
-const data = &[_]SharedMemory{
-    try SharedMemory.newSlice(&[_]u32{0, 1, 2, 3, 4}),
+const data = &[_]zcompute.SharedMemory{
+    try zcompute.SharedMemory.newSlice(&[_]u32{0, 1, 2, 3, 4}),
 };
-const dispatch = zcomp.Dispatch{ .x = 5, .y = 1, .z = 1 };
+const dispatch = zcompute.Dispatch{ .x = 5, .y = 1, .z = 1 };
 
-var app = try zcomp.App.init(
+var app = try zcompute.App.init(
     allocator,
     .{},
-    "shader.spv",
+    "src/shader.spv",
     data,
     dispatch,
 );
