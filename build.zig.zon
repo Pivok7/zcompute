@@ -17,10 +17,6 @@
             .url = "git+https://github.com/zig-gamedev/zglfw#feeeff9386dd44ba2c18488113023865c41b80a4",
             .hash = "zglfw-0.10.0-dev-zgVDNLyhIQCZR_rbIf7hnCKuifzcmPOLOQhd_hrqq8cl",
         },
-        .vulkan = .{
-            .url = "git+https://github.com/Snektron/vulkan-zig#ed429842b8ad60966bc3b8b214606d8a5714f99e",
-            .hash = "vulkan-0.0.0-r7Ytx5w-AwC04xBpfzcuIjGyYv2z6xb1i49ZUeNUgT5H",
-        },
     },
 
     .paths = .{
