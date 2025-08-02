@@ -1,0 +1,31 @@
+.{
+    .name = .zcomp,
+    .version = "0.1.0",
+    .minimum_zig_version = "0.14.1",
+    .fingerprint = 0x9f0ebf55b87c3155,
+
+    .dependencies = .{
+        .vulkan_zig = .{
+            .url = "https://github.com/Snektron/vulkan-zig/archive/e492b17810d775986e2eefd751f5526d9c3b2618.tar.gz",
+            .hash = "1220129ea1652cc0f8578db3dcba254bc9fbc6fdd195b5e1021bf4da8592ea5dc9fb",
+        },
+        .vulkan_headers = .{
+            .url = "https://github.com/KhronosGroup/Vulkan-Headers/archive/v1.3.283.tar.gz",
+            .hash = "N-V-__8AAAkkoQGn5z1yoNVrwqZfnYmZp8AZ5CJgoHRMQI0c",
+        },
+        .zglfw = .{
+            .url = "git+https://github.com/zig-gamedev/zglfw#feeeff9386dd44ba2c18488113023865c41b80a4",
+            .hash = "zglfw-0.10.0-dev-zgVDNLyhIQCZR_rbIf7hnCKuifzcmPOLOQhd_hrqq8cl",
+        },
+        .vulkan = .{
+            .url = "git+https://github.com/Snektron/vulkan-zig#ed429842b8ad60966bc3b8b214606d8a5714f99e",
+            .hash = "vulkan-0.0.0-r7Ytx5w-AwC04xBpfzcuIjGyYv2z6xb1i49ZUeNUgT5H",
+        },
+    },
+
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
