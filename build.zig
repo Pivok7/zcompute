@@ -17,10 +17,10 @@ pub fn build(b: *std.Build) void {
     });
     
     // Libraries
-    const vulkan = b.dependency("vulkan_zig", .{
+    const vulkan_zig_deb = b.dependency("vulkan", .{
         .registry = b.dependency("vulkan_headers", .{}).path("registry/vk.xml"),
     }).module("vulkan-zig");
-    exe.root_module.addImport("vulkan", vulkan);
+    exe.root_module.addImport("vulkan", vulkan_zig_deb);
 
     const zglfw_dep = b.dependency("zglfw", .{
         .target = target,
