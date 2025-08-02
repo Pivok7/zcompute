@@ -36,7 +36,7 @@ const dispatch = zcompute.Dispatch{ .x = 5, .y = 1, .z = 1 };
 var app = try zcompute.App.init(
     allocator,
     .{},
-    "src/shader.spv",
+    "shader.spv",
     data,
     dispatch,
 );
