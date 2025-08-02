@@ -37,6 +37,7 @@ const apis: []const vk.ApiInfo = &.{
             .createDevice = true,
             .getDeviceProcAddr = true,
             .getPhysicalDeviceMemoryProperties = true,
+            .getPhysicalDeviceFeatures2 = true,
         },
         .device_commands = .{
             .destroyDevice = true,

@@ -93,7 +93,12 @@ pub fn createLogicalDevice(app: *const VulkanApp) !vk.Device {
         };
     }
 
+    const features_AMD = vk.PhysicalDeviceCoherentMemoryFeaturesAMD{
+        .device_coherent_memory = vk.TRUE,
+    };
+
     var create_info = vk.DeviceCreateInfo{
+        .p_next = if (supportsCoherentMemoryAMD(app)) @ptrCast(&features_AMD) else null,
         .p_queue_create_infos = queue_create_infos.ptr,
         .queue_create_info_count = 1,
         .enabled_extension_count = misc.device_extensions.len,
@@ -113,4 +118,18 @@ pub fn getComputeQueue(app: *VulkanApp) !vk.Queue {
 pub fn getComputeQueueIndex(app: *VulkanApp) !u32 {
     const indices: QueueFamilyIndices = try findQueueFamilies(app, app.physical_device);
     return indices.compute_family.?;
+}
+
+fn supportsCoherentMemoryAMD(app: *const VulkanApp) bool {
+    var features = vk.PhysicalDeviceCoherentMemoryFeaturesAMD{};
+
+    var features2 = vk.PhysicalDeviceFeatures2{
+        .p_next = @ptrCast(&features),
+        .features = .{},
+    };
+
+    app.vki.getPhysicalDeviceFeatures2(app.physical_device, &features2);
+
+    if (features.device_coherent_memory == vk.TRUE) return true
+    else return false;
 }
