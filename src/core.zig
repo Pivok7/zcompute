@@ -187,11 +187,11 @@ pub const VulkanApp = struct {
         app.device_buffers.deinit();
     }
 
-    pub fn run(app: *Self) !void {
+    pub fn run(app: *const Self) !void {
         try command.submitWork(app);
     }
     
-    pub fn getData(app: *const VulkanApp, buf: anytype, index: usize, T: type) !void {
+    pub fn getData(app: *const Self, buf: anytype, index: usize, T: type) !void {
         const dev_mem = app.device_memories.items[index];
         const shdr_mem = app.shared_memories[index];
 
@@ -204,7 +204,7 @@ pub const VulkanApp = struct {
         app.vkd.unmapMemory(app.device, dev_mem);
     }
 
-    pub fn getDataAlloc(app: *const VulkanApp, allocator: Allocator, index: usize, T: type) ![]T {
+    pub fn getDataAlloc(app: *const Self, allocator: Allocator, index: usize, T: type) ![]T {
         const buf = try allocator.alloc(T, app.shared_memories[index].elem_num);
 
         try app.getData(buf, index, T);
@@ -212,7 +212,7 @@ pub const VulkanApp = struct {
         return buf;
     }
 
-    pub fn log(app: *VulkanApp, level: std.log.Level, comptime format: []const u8, args: anytype) void {
+    pub fn log(app: *const Self, level: std.log.Level, comptime format: []const u8, args: anytype) void {
         if (app.debug_mode) {
             switch (level) {
                 .debug => std.log.debug(format, args),

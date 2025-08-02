@@ -6,7 +6,7 @@ const core = @import("core.zig");
 const VkAssert = vk_ctx.VkAssert;
 const VulkanApp = core.VulkanApp;
 
-pub fn createDescriptorSetLayout(app: *VulkanApp) !vk.DescriptorSetLayout {
+pub fn createDescriptorSetLayout(app: *const VulkanApp) !vk.DescriptorSetLayout {
     var layout_bindings = std.ArrayList(vk.DescriptorSetLayoutBinding).init(app.allocator);
     defer layout_bindings.deinit();
 
@@ -31,7 +31,7 @@ pub fn createDescriptorSetLayout(app: *VulkanApp) !vk.DescriptorSetLayout {
     );
 }
 
-pub fn createPipelineLayout(app: *VulkanApp) !vk.PipelineLayout {
+pub fn createPipelineLayout(app: *const VulkanApp) !vk.PipelineLayout {
     const create_info = vk.PipelineLayoutCreateInfo{
         .set_layout_count = 1,
         .p_set_layouts = @ptrCast(&app.descriptor_set_layout),
@@ -40,13 +40,13 @@ pub fn createPipelineLayout(app: *VulkanApp) !vk.PipelineLayout {
     return app.vkd.createPipelineLayout(app.device, &create_info, null);
 }
 
-pub fn createPipelineCache(app: *VulkanApp) !vk.PipelineCache {
+pub fn createPipelineCache(app: *const VulkanApp) !vk.PipelineCache {
     const create_info = vk.PipelineCacheCreateInfo{};
     
     return app.vkd.createPipelineCache(app.device, &create_info, null);
 }
 
-pub fn CreatePipeline(app: *VulkanApp) !vk.Pipeline {
+pub fn CreatePipeline(app: *const VulkanApp) !vk.Pipeline {
     const shared_create_info = vk.PipelineShaderStageCreateInfo{
         .stage = .{ .compute_bit = true },
         .module = app.shader_module,
@@ -75,7 +75,7 @@ pub fn CreatePipeline(app: *VulkanApp) !vk.Pipeline {
     return pipeline;
 }
 
-pub fn createDescriptorPool(app: *VulkanApp) !vk.DescriptorPool {
+pub fn createDescriptorPool(app: *const VulkanApp) !vk.DescriptorPool {
     const pool_sizes = [_]vk.DescriptorPoolSize{
         .{
             .type = .storage_buffer,
@@ -92,7 +92,7 @@ pub fn createDescriptorPool(app: *VulkanApp) !vk.DescriptorPool {
     return app.vkd.createDescriptorPool(app.device, &create_info, null);
 }
 
-pub fn createDescriptorSet(app: *VulkanApp) !vk.DescriptorSet {
+pub fn createDescriptorSet(app: *const VulkanApp) !vk.DescriptorSet {
     const allocate_info = vk.DescriptorSetAllocateInfo{
         .descriptor_pool = app.descriptor_pool,
         .descriptor_set_count = 1,

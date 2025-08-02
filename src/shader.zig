@@ -4,7 +4,7 @@ const core = @import("core.zig");
 
 const VulkanApp = core.VulkanApp;
 
-pub fn createShaderModuleFromFilePath(app: *VulkanApp, file_path: []const u8) !vk.ShaderModule {
+pub fn createShaderModuleFromFilePath(app: *const VulkanApp, file_path: []const u8) !vk.ShaderModule {
     var file = try std.fs.cwd().openFile(file_path, .{});
 
     const file_data = file.reader().readAllAlloc(app.allocator, std.math.maxInt(usize)) catch |err| {
@@ -17,7 +17,7 @@ pub fn createShaderModuleFromFilePath(app: *VulkanApp, file_path: []const u8) !v
     return try createShaderModule(app, file_data);
 }
 
-pub fn createShaderModule(app: *VulkanApp, code: []const u8) !vk.ShaderModule {
+pub fn createShaderModule(app: *const VulkanApp, code: []const u8) !vk.ShaderModule {
     const create_info = vk.ShaderModuleCreateInfo{
         .code_size = code.len,
         .p_code = @ptrCast(@alignCast(code.ptr)),

@@ -97,8 +97,10 @@ pub fn createLogicalDevice(app: *const VulkanApp) !vk.Device {
         .device_coherent_memory = vk.TRUE,
     };
 
+    const supports_coherent_memory_AMD = supportsCoherentMemoryAMD(app);
+
     var create_info = vk.DeviceCreateInfo{
-        .p_next = if (supportsCoherentMemoryAMD(app)) @ptrCast(&features_AMD) else null,
+        .p_next = if (supports_coherent_memory_AMD) @ptrCast(&features_AMD) else null,
         .p_queue_create_infos = queue_create_infos.ptr,
         .queue_create_info_count = 1,
         .enabled_extension_count = misc.device_extensions.len,
@@ -107,15 +109,19 @@ pub fn createLogicalDevice(app: *const VulkanApp) !vk.Device {
         .pp_enabled_layer_names = if (app.enable_validation_layers) @ptrCast(&misc.validation_layers) else null,
     };
 
+    if (supports_coherent_memory_AMD) {
+        app.log(.debug, "Enabled device coherent memory for AMD", .{});
+    }
+
     return try app.vki.createDevice(app.physical_device, &create_info, null);
 }
 
-pub fn getComputeQueue(app: *VulkanApp) !vk.Queue {
+pub fn getComputeQueue(app: *const VulkanApp) !vk.Queue {
     const indices: QueueFamilyIndices = try findQueueFamilies(app, app.physical_device);
     return app.vkd.getDeviceQueue(app.device, indices.compute_family.?, 0);
 }
 
-pub fn getComputeQueueIndex(app: *VulkanApp) !u32 {
+pub fn getComputeQueueIndex(app: *const VulkanApp) !u32 {
     const indices: QueueFamilyIndices = try findQueueFamilies(app, app.physical_device);
     return indices.compute_family.?;
 }

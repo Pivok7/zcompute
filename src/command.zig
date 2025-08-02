@@ -6,7 +6,7 @@ const core = @import("core.zig");
 const VkAssert = vk_ctx.VkAssert;
 const VulkanApp = core.VulkanApp;
 
-pub fn createCommandPool(app: *VulkanApp) !vk.CommandPool{
+pub fn createCommandPool(app: *const VulkanApp) !vk.CommandPool{
     const create_info = vk.CommandPoolCreateInfo{
         .queue_family_index = app.compute_queue_index,
     };
@@ -18,7 +18,7 @@ pub fn createCommandPool(app: *VulkanApp) !vk.CommandPool{
     );
 }
 
-pub fn createCommandBuffer(app: *VulkanApp) !vk.CommandBuffer {
+pub fn createCommandBuffer(app: *const VulkanApp) !vk.CommandBuffer {
     const allocate_info = vk.CommandBufferAllocateInfo{
         .command_pool = app.command_pool,
         .level = .primary,
@@ -50,7 +50,7 @@ pub fn createCommandBuffer(app: *VulkanApp) !vk.CommandBuffer {
     return command_buffer;
 }
 
-pub fn submitWork(app: *VulkanApp) !void {
+pub fn submitWork(app: *const VulkanApp) !void {
     const queue = app.vkd.getDeviceQueue(app.device, app.compute_queue_index, 0);
 
     const fence_create_info = vk.FenceCreateInfo{};
