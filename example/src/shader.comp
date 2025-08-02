@@ -9,9 +9,14 @@ layout(std430, binding = 1) buffer lay1 {
     float buf_two[];
 };
 
+layout(std430, binding = 2) buffer lay2 {
+    int buf_three[];
+};
+
 void main() {
     const uint id = gl_GlobalInvocationID.x;
 
-    buf_one[id] = buf_one[id] * buf_one[id];
+    buf_one[id] = buf_one[id] + buf_one[id];
     buf_two[id] = buf_two[id] * buf_two[id];
+    buf_three[id] = int(id) - 4;
 }

@@ -1,12 +1,6 @@
 const std = @import("std");
-const builtin = @import("builtin");
-const zcomp = @import("zcomp.zig");
+const zcomp = @import("zcompute");
 const SharedMemory = zcomp.SharedMemory;
-
-pub const debug_mode = switch (builtin.mode) {
-    .Debug => true,
-    else => false,
-};
 
 pub fn main() !void {
     var dba = std.heap.DebugAllocator(.{}){};
@@ -16,16 +10,14 @@ pub fn main() !void {
     const data = &[_]SharedMemory{
         try SharedMemory.newSlice(&[_]u32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}),
         try SharedMemory.newSlice(&[_]f32{0, 1.1, 2, 3, 4, 5, 6, 7.7, 8, 9}),
+        try SharedMemory.newEmpty(10, i32),
     };
     const dispatch = zcomp.Dispatch{ .x = 10, .y = 1, .z = 1 };
 
     var app = try zcomp.App.init(
         allocator,
-        .{
-            .debug_mode = debug_mode,
-            .enable_validation_layers = debug_mode,
-        },
-        "src/shaders/square.spv",
+        .{},
+        "src/shader.spv",
         data,
         dispatch,
     );
@@ -41,6 +33,10 @@ pub fn main() !void {
     const two = try app.getDataAlloc(allocator, 1, f32);
     defer allocator.free(two);
 
+    const three = try app.getDataAlloc(allocator, 2, i32);
+    defer allocator.free(three);
+
     std.debug.print("{d}\n", .{one});
     std.debug.print("{d}\n", .{two});
+    std.debug.print("{d}\n", .{three});
 }

@@ -30,7 +30,10 @@ pub const SharedMemory = struct {
         return self.elem_num * self.elem_size;
     }
 
-    pub fn newEmpty(len: usize, T: type) Self {
+    pub fn newEmpty(len: u32, T: type) !Self {
+        if (len == 0) return error.LengthTooShort;
+        if (@sizeOf(T) == 0) return error.ZeroSizeType;
+
         return .{
             .elem_num = len,
             .elem_size = @sizeOf(T),
@@ -41,6 +44,7 @@ pub const SharedMemory = struct {
         if (slice.len == 0) return error.NotSlice;
 
         const child_type = @typeInfo(@TypeOf(slice)).pointer.child;
+        if (@sizeOf(child_type) == 0) return error.ZeroSizeType;
 
         return .{
             .data = slice.ptr,

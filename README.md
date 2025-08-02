@@ -1,4 +1,4 @@
-# zcomp
+# zcompute
 
 Simple Vulkan library for running compute shaders on the GPU
 
