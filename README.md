@@ -73,7 +73,3 @@ For complete program check out the 'example' folder
 
 * vulkan-zig: https://github.com/Snektron/vulkan-zig.git <br>
 Licensed under the MIT License.
-
-
-* zglfw: https://github.com/zig-gamedev/zglfw.git <br>
-Licensed under the MIT License.

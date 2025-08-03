@@ -1,7 +1,7 @@
 const std = @import("std");
 const vk = @import("vulkan");
 const vk_ctx = @import("vk_context.zig");
-const glfw = @import("zglfw");
+const loader = @import("loader.zig");
 const instance = @import("instance.zig");
 const device = @import("device.zig");
 const memory = @import("memory.zig");
@@ -67,6 +67,8 @@ pub const VulkanApp = struct {
     debug_mode: bool,
     enable_validation_layers: bool,
 
+    vulkan_lib: std.DynLib = undefined,
+
     vkb: BaseDispatch = undefined,
     vki: InstanceDispatch = undefined,
     vkd: DeviceDispatch = undefined,
@@ -121,10 +123,11 @@ pub const VulkanApp = struct {
             .dispatch = dispatch,
         };
 
-        try glfw.init();
-        app.log(.debug, "Initialized GLFW", .{});
+        app.vulkan_lib = try loader.loadVulkan();
+        const vkGetInstanceProcAddr = try loader.loadVkGetInstanceProcAddr(&app.vulkan_lib);
+        app.log(.debug, "Loaded Vulkan library", .{});
 
-        app.vkb = try BaseDispatch.load(vk_ctx.glfwGetInstanceProcAddress);
+        app.vkb = try BaseDispatch.load(vkGetInstanceProcAddr);
 
         app.instance_extensions = try instance.getRequiredExtensions(&app);
         app.instance = try instance.createInstance(&app);
@@ -190,8 +193,8 @@ pub const VulkanApp = struct {
         app.vki.destroyInstance(app.instance, null);
         app.log(.info, "Destroyed Vulkan instance", .{});
 
-        glfw.terminate();
-        app.log(.debug, "Terminated GLFW", .{});
+        app.vulkan_lib.close();
+        app.log(.debug, "Unloaded Vulkan library", .{});
 
         app.allocator.free(app.instance_extensions);
         app.device_memories.deinit();

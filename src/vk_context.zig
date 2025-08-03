@@ -1,6 +1,5 @@
 const std = @import("std");
 const vk = @import("vulkan");
-const glfw = @import("zglfw");
 
 pub const VkAssert = struct {
     pub fn basic(result: vk.Result) !void {
@@ -84,5 +83,3 @@ const apis: []const vk.ApiInfo = &.{
 pub const BaseDispatch = vk.BaseWrapper(apis);
 pub const InstanceDispatch = vk.InstanceWrapper(apis);
 pub const DeviceDispatch = vk.DeviceWrapper(apis);
-
-pub extern fn glfwGetInstanceProcAddress(instance: vk.Instance, procname: [*:0]const u8) vk.PfnVoidFunction;

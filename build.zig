@@ -16,13 +16,6 @@ pub fn build(b: *std.Build) void {
     }).module("vulkan-zig");
     lib.addImport("vulkan", vulkan_zig_deb);
 
-    const zglfw_dep = b.dependency("zglfw", .{
-        .target = target,
-        .optimize = optimize,
-    });
-    lib.addImport("zglfw", zglfw_dep.module("root"));
-
-    if (target.result.os.tag != .emscripten) {
-        lib.linkLibrary(zglfw_dep.artifact("glfw"));
-    }
+    lib.linkSystemLibrary("vulkan", .{});
+    lib.link_libc = true;
 }

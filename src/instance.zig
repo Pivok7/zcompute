@@ -1,7 +1,6 @@
 const std = @import("std");
 const vk = @import("vulkan");
 const vk_ctx = @import("vk_context.zig");
-const glfw = @import("zglfw");
 const misc = @import("misc.zig");
 const core = @import("core.zig");
 
@@ -14,11 +13,7 @@ const validation_layers = misc.validation_layers;
 const VulkanApp = core.VulkanApp;
 
 pub fn getRequiredExtensions(app: *const VulkanApp) ![][*:0]const u8 {
-    var glfw_extensions: [][*:0]const u8 = undefined;
-    glfw_extensions = try glfw.getRequiredInstanceExtensions();
-
     var extensions = std.ArrayList([*:0]const u8).init(app.allocator);
-    try extensions.appendSlice(glfw_extensions);
     try extensions.append(vk.extensions.ext_debug_utils.name);
 
     return try extensions.toOwnedSlice();
