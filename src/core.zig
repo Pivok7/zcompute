@@ -30,7 +30,7 @@ pub const SharedMemory = struct {
         return self.elem_num * self.elem_size;
     }
 
-    pub fn newEmpty(len: u32, T: type) !Self {
+    pub fn newEmpty(T: type, len: u32) !Self {
         if (len == 0) return error.LengthTooShort;
         if (@sizeOf(T) == 0) return error.ZeroSizeType;
 

@@ -10,7 +10,7 @@ pub fn main() !void {
     const data = &[_]SharedMemory{
         try SharedMemory.newSlice(&[_]u32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}),
         try SharedMemory.newSlice(&[_]f32{0, 1.1, 2, 3, 4, 5, 6, 7.7, 8, 9}),
-        try SharedMemory.newEmpty(10, i32),
+        try SharedMemory.newEmpty(i32, 10),
     };
     const dispatch = zcomp.Dispatch{ .x = 10, .y = 1, .z = 1 };
 
