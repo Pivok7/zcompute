@@ -48,7 +48,7 @@ pub const SharedMemory = struct {
 
         return .{
             .data = slice.ptr,
-            .elem_num = slice.len,
+            .elem_num = @intCast(slice.len),
             .elem_size = @sizeOf(child_type),
         };
     }
