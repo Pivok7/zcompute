@@ -16,7 +16,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     exe.root_module.addImport("zcompute", zcompute_dep.module("zcompute"));
-    
+
     b.installArtifact(exe);
 
     // Shader compilation

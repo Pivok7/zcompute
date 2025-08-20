@@ -36,13 +36,13 @@ pub fn createPipelineLayout(app: *const VulkanApp) !vk.PipelineLayout {
         .set_layout_count = 1,
         .p_set_layouts = @ptrCast(&app.descriptor_set_layout),
     };
-    
+
     return app.vkd.createPipelineLayout(app.device, &create_info, null);
 }
 
 pub fn createPipelineCache(app: *const VulkanApp) !vk.PipelineCache {
     const create_info = vk.PipelineCacheCreateInfo{};
-    
+
     return app.vkd.createPipelineCache(app.device, &create_info, null);
 }
 
