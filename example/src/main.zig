@@ -36,7 +36,7 @@ pub fn main() !void {
     const three = try app.getDataAlloc(allocator, 2, i32);
     defer allocator.free(three);
 
-    std.debug.print("{d}\n", .{one});
-    std.debug.print("{d}\n", .{two});
-    std.debug.print("{d}\n", .{three});
+    std.debug.print("{any}\n", .{one});
+    std.debug.print("{any}\n", .{two});
+    std.debug.print("{any}\n", .{three});
 }

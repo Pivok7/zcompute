@@ -24,14 +24,17 @@ pub fn createBuffer(app: *VulkanApp) !void {
         };
 
         const buffer = try app.vkd.createBuffer(app.device, &buffer_create_info, null);
-        try app.device_buffers.append(buffer);
+        try app.device_buffers.append(app.allocator, buffer);
     }
 
-    var mem_requirements = std.ArrayList(vk.MemoryRequirements).init(app.allocator);
-    defer mem_requirements.deinit();
+    var mem_requirements = std.ArrayList(vk.MemoryRequirements){};
+    defer mem_requirements.deinit(app.allocator);
 
     for (app.device_buffers.items) |buffer| {
-        try mem_requirements.append(app.vkd.getBufferMemoryRequirements(app.device, buffer));
+        try mem_requirements.append(
+            app.allocator,
+            app.vkd.getBufferMemoryRequirements(app.device, buffer)
+        );
     }
 
     const mem_properties = app.vki.getPhysicalDeviceMemoryProperties(app.physical_device);
@@ -61,11 +64,11 @@ pub fn createBuffer(app: *VulkanApp) !void {
         app.log(.info, "Memory heap size: {d}GB", .{mem_heap_size_GB});
     }
 
-    var alloc_infos = std.ArrayList(vk.MemoryAllocateInfo).init(app.allocator);
-    defer alloc_infos.deinit();
+    var alloc_infos = std.ArrayList(vk.MemoryAllocateInfo){};
+    defer alloc_infos.deinit(app.allocator);
 
     for (mem_requirements.items) |mem_req| {
-        try alloc_infos.append(.{
+        try alloc_infos.append(app.allocator, .{
             .allocation_size = mem_req.size,
             .memory_type_index = mem_type_index,
         });
@@ -73,7 +76,7 @@ pub fn createBuffer(app: *VulkanApp) !void {
 
     for (alloc_infos.items) |alloc_info| {
         const buffer_memory = try app.vkd.allocateMemory(app.device, &alloc_info, null);
-        try app.device_memories.append(buffer_memory);
+        try app.device_memories.append(app.allocator, buffer_memory);
     }
 
     for (app.device_memories.items, app.shared_memories, 0..) |dev_mem, shdr_mem, i| {

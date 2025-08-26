@@ -1,22 +1,17 @@
 const std = @import("std");
 const vk = @import("vulkan");
-const vk_ctx = @import("vk_context.zig");
-const misc = @import("misc.zig");
+const c = @import("c.zig");
 const core = @import("core.zig");
 
-const VkAssert = vk_ctx.VkAssert;
-const BaseDispatch = vk_ctx.BaseDispatch;
-const InstanceDispatch = vk_ctx.InstanceDispatch;
-const DeviceDispatch = vk_ctx.DeviceDispatch;
-
-const validation_layers = misc.validation_layers;
 const VulkanApp = core.VulkanApp;
+const vkAssesrt = core.VkAssert;
+const validation_layers = core.validation_layers;
 
 pub fn getRequiredExtensions(app: *const VulkanApp) ![][*:0]const u8 {
-    var extensions = std.ArrayList([*:0]const u8).init(app.allocator);
-    try extensions.append(vk.extensions.ext_debug_utils.name);
+    var extensions = std.ArrayList([*:0]const u8){};
+    try extensions.append(app.allocator, vk.extensions.ext_debug_utils.name);
 
-    return try extensions.toOwnedSlice();
+    return try extensions.toOwnedSlice(app.allocator);
 }
 
 pub fn createInstance(app: *const VulkanApp) !vk.Instance {
@@ -26,10 +21,10 @@ pub fn createInstance(app: *const VulkanApp) !vk.Instance {
 
     const app_info = vk.ApplicationInfo{
         .p_application_name = "Vulkan",
-        .application_version = vk.makeApiVersion(0, 1, 0, 0),
+        .application_version = @bitCast(vk.makeApiVersion(0, 1, 0, 0)),
         .p_engine_name = "No Engine",
-        .engine_version = vk.makeApiVersion(0, 1, 0, 0),
-        .api_version = vk.makeApiVersion(0, 1, 3, 0),
+        .engine_version = @bitCast(vk.makeApiVersion(0, 1, 0, 0)),
+        .api_version = @bitCast(vk.makeApiVersion(0, 1, 3, 0)),
     };
 
     const create_info = vk.InstanceCreateInfo{
@@ -47,20 +42,20 @@ pub fn createInstance(app: *const VulkanApp) !vk.Instance {
 fn checkValidationLayerSupport(app: *const VulkanApp) !void {
     var layer_count: u32 = 0;
     var result = try app.vkb.enumerateInstanceLayerProperties(&layer_count, null);
-    try VkAssert.withMessage(result, "Failed to enumerate instance layer properties.");
+    try vkAssesrt.withMessage(result, "Failed to enumerate instance layer properties.");
 
     const available_layers = try app.allocator.alloc(vk.LayerProperties, layer_count);
     defer app.allocator.free(available_layers);
 
     result = try app.vkb.enumerateInstanceLayerProperties(&layer_count, @ptrCast(available_layers));
-    try VkAssert.withMessage(result, "Failed to enumerate instance layer properties.");
+    try vkAssesrt.withMessage(result, "Failed to enumerate instance layer properties.");
 
     // Print validation layers if debug mode is on
     if (app.debug_mode and validation_layers.len > 0) {
         std.debug.print("Active validation layers ({d}): \n", .{validation_layers.len});
         for (validation_layers) |val_layer| {
             for (available_layers) |ava_layer| {
-                    if (misc.cStringEql(val_layer, &ava_layer.layer_name)) {
+                if (c.cStringEql(val_layer, &ava_layer.layer_name)) {
                     std.debug.print("\t [X] {s}\n", .{ava_layer.layer_name});
                 } else {
                     std.debug.print("\t [ ] {s}\n", .{ava_layer.layer_name});
@@ -73,7 +68,7 @@ fn checkValidationLayerSupport(app: *const VulkanApp) !void {
         var found_layer: bool = false;
 
         for (available_layers) |ava_layer| {
-            if (misc.cStringEql(val_layer, &ava_layer.layer_name)) {
+            if (c.cStringEql(val_layer, &ava_layer.layer_name)) {
                 found_layer = true;
                 break;
             }

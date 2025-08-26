@@ -1,6 +1,5 @@
 const std = @import("std");
 const vk = @import("vulkan");
-const vk_ctx = @import("vk_context.zig");
 const loader = @import("loader.zig");
 const instance = @import("instance.zig");
 const device = @import("device.zig");
@@ -10,9 +9,16 @@ const pipeline = @import("pipeline.zig");
 const command = @import("command.zig");
 
 const Allocator = std.mem.Allocator;
-const BaseDispatch = vk_ctx.BaseDispatch;
-const InstanceDispatch = vk_ctx.InstanceDispatch;
-const DeviceDispatch = vk_ctx.DeviceDispatch;
+const BaseWrapper = vk.BaseDispatch;
+const InstanceWrapper = vk.InstanceDispatch;
+const DeviceWrapper = vk.DeviceDispatch;
+
+pub const validation_layers = [_][*:0]const u8{
+    "VK_LAYER_KHRONOS_validation",
+};
+
+pub const device_extensions = [_][*:0]const u8{
+};
 
 pub const VulkanAppOptions = struct {
     debug_mode: bool = false,
@@ -60,6 +66,25 @@ pub const Dispatch = struct {
     z: usize,
 };
 
+pub const VkAssert = struct {
+    pub fn basic(result: vk.Result) !void {
+        switch (result) {
+            .success => return,
+            else => return error.Unknown,
+        }
+    }
+
+    pub fn withMessage(result: vk.Result, message: []const u8) !void {
+        switch (result) {
+            .success => return,
+            else => {
+                std.log.err("{s} {s}", .{ @tagName(result), message });
+                return error.Unknown;
+            },
+        }
+    }
+};
+
 pub const VulkanApp = struct {
     const Self = @This();
 
@@ -69,9 +94,9 @@ pub const VulkanApp = struct {
 
     vulkan_lib: std.DynLib = undefined,
 
-    vkb: BaseDispatch = undefined,
-    vki: InstanceDispatch = undefined,
-    vkd: DeviceDispatch = undefined,
+    vkb: vk.BaseWrapper = undefined,
+    vki: vk.InstanceWrapper = undefined,
+    vkd: vk.DeviceWrapper = undefined,
 
     instance: vk.Instance = .null_handle,
     instance_extensions: [][*:0]const u8 = undefined,
@@ -127,13 +152,13 @@ pub const VulkanApp = struct {
         const vkGetInstanceProcAddr = try loader.loadVkGetInstanceProcAddr(&app.vulkan_lib);
         app.log(.debug, "Loaded Vulkan library", .{});
 
-        app.vkb = try BaseDispatch.load(vkGetInstanceProcAddr);
+        app.vkb = vk.BaseWrapper.load(vkGetInstanceProcAddr);
 
         app.instance_extensions = try instance.getRequiredExtensions(&app);
         app.instance = try instance.createInstance(&app);
         app.log(.info, "Created Vulkan instance", .{});
 
-        app.vki = try InstanceDispatch.load(app.instance, app.vkb.dispatch.vkGetInstanceProcAddr);
+        app.vki = vk.InstanceWrapper.load(app.instance, app.vkb.dispatch.vkGetInstanceProcAddr.?);
 
         app.physical_device = try device.pickPhysicalDevice(&app);
         app.log(.info, "Device: {s}", .{app.vki.getPhysicalDeviceProperties(app.physical_device).device_name});
@@ -141,13 +166,13 @@ pub const VulkanApp = struct {
         app.device = try device.createLogicalDevice(&app);
         app.log(.debug, "Created logical device", .{});
 
-        app.vkd = try DeviceDispatch.load(app.device, app.vki.dispatch.vkGetDeviceProcAddr);
+        app.vkd = vk.DeviceWrapper.load(app.device, app.vki.dispatch.vkGetDeviceProcAddr.?);
 
         app.compute_queue = try device.getComputeQueue(&app);
         app.compute_queue_index = try device.getComputeQueueIndex(&app);
 
-        app.device_memories = std.ArrayList(vk.DeviceMemory).init(app.allocator);
-        app.device_buffers = std.ArrayList(vk.Buffer).init(app.allocator);
+        app.device_memories = std.ArrayList(vk.DeviceMemory){};
+        app.device_buffers = std.ArrayList(vk.Buffer){};
 
         try memory.createBuffer(&app);
         app.log(.debug, "Created memory buffer", .{});
@@ -197,14 +222,14 @@ pub const VulkanApp = struct {
         app.log(.debug, "Unloaded Vulkan library", .{});
 
         app.allocator.free(app.instance_extensions);
-        app.device_memories.deinit();
-        app.device_buffers.deinit();
+        app.device_memories.deinit(app.allocator);
+        app.device_buffers.deinit(app.allocator);
     }
 
     pub fn run(app: *const Self) !void {
         try command.submitWork(app);
     }
-    
+
     pub fn getData(app: *const Self, buf: anytype, index: usize, T: type) !void {
         const dev_mem = app.device_memories.items[index];
         const shdr_mem = app.shared_memories[index];

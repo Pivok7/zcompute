@@ -1,10 +1,9 @@
 const std = @import("std");
 const vk = @import("vulkan");
-const vk_ctx = @import("vk_context.zig");
 const core = @import("core.zig");
 
-const VkAssert = vk_ctx.VkAssert;
 const VulkanApp = core.VulkanApp;
+const VkAssert = core.VkAssert;
 
 pub fn createCommandPool(app: *const VulkanApp) !vk.CommandPool{
     const create_info = vk.CommandPoolCreateInfo{

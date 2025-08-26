@@ -1,11 +1,11 @@
 const std = @import("std");
 const vk = @import("vulkan");
-const vk_ctx = @import("vk_context.zig");
-const misc = @import("misc.zig");
 const core = @import("core.zig");
 
 const VulkanApp = core.VulkanApp;
-const VkAssert = vk_ctx.VkAssert;
+const VkAssert = core.VkAssert;
+const validation_layers = core.validation_layers;
+const device_extensions = core.device_extensions;
 
 const QueueFamilyIndices = struct {
     compute_family: ?u32 = null,
@@ -67,8 +67,8 @@ fn findQueueFamilies(app: *const VulkanApp, device: vk.PhysicalDevice) !QueueFam
 pub fn createLogicalDevice(app: *const VulkanApp) !vk.Device {
     const indices: QueueFamilyIndices = try findQueueFamilies(app, app.physical_device);
 
-    var unique_queue_families = std.ArrayList(u32).init(app.allocator);
-    defer unique_queue_families.deinit();
+    var unique_queue_families = std.ArrayList(u32){};
+    defer unique_queue_families.deinit(app.allocator);
 
     const all_queue_families = &[_]u32{ indices.compute_family.? };
 
@@ -78,7 +78,7 @@ pub fn createLogicalDevice(app: *const VulkanApp) !vk.Device {
                 continue;
             }
         }
-        try unique_queue_families.append(queue_family);
+        try unique_queue_families.append(app.allocator, queue_family);
     }
 
     var queue_create_infos = try app.allocator.alloc(vk.DeviceQueueCreateInfo, unique_queue_families.items.len);
@@ -103,10 +103,10 @@ pub fn createLogicalDevice(app: *const VulkanApp) !vk.Device {
         .p_next = if (supports_coherent_memory_AMD) @ptrCast(&features_AMD) else null,
         .p_queue_create_infos = queue_create_infos.ptr,
         .queue_create_info_count = 1,
-        .enabled_extension_count = misc.device_extensions.len,
-        .pp_enabled_extension_names = @ptrCast(&misc.device_extensions),
-        .enabled_layer_count = if (app.enable_validation_layers) @intCast(misc.validation_layers.len) else 0,
-        .pp_enabled_layer_names = if (app.enable_validation_layers) @ptrCast(&misc.validation_layers) else null,
+        .enabled_extension_count = device_extensions.len,
+        .pp_enabled_extension_names = @ptrCast(&device_extensions),
+        .enabled_layer_count = if (app.enable_validation_layers) @intCast(validation_layers.len) else 0,
+        .pp_enabled_layer_names = if (app.enable_validation_layers) @ptrCast(&validation_layers) else null,
     };
 
     if (supports_coherent_memory_AMD) {
