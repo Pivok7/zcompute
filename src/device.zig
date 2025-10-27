@@ -93,25 +93,33 @@ pub fn createLogicalDevice(app: *const VulkanApp) !vk.Device {
         };
     }
 
-    const features_AMD = vk.PhysicalDeviceCoherentMemoryFeaturesAMD{
+    var feature_chain: ?*anyopaque = null;
+
+    var features_AMD = vk.PhysicalDeviceCoherentMemoryFeaturesAMD{
         .device_coherent_memory = vk.TRUE,
+    };
+
+    var device_features = vk.PhysicalDeviceFeatures{
+        .shader_float_64 = if (app.options.features.float64) vk.TRUE else vk.FALSE,
     };
 
     const supports_coherent_memory_AMD = supportsCoherentMemoryAMD(app);
 
+    if (supports_coherent_memory_AMD) {
+        appendFeatureChain(&feature_chain, @ptrCast(&features_AMD));
+        app.log(.debug, "Enabled device coherent memory for AMD", .{});
+    }
+
     var create_info = vk.DeviceCreateInfo{
-        .p_next = if (supports_coherent_memory_AMD) @ptrCast(&features_AMD) else null,
+        .p_next = feature_chain,
+        .p_enabled_features = &device_features,
         .p_queue_create_infos = queue_create_infos.ptr,
         .queue_create_info_count = 1,
         .enabled_extension_count = device_extensions.len,
         .pp_enabled_extension_names = @ptrCast(&device_extensions),
-        .enabled_layer_count = if (app.enable_validation_layers) @intCast(validation_layers.len) else 0,
-        .pp_enabled_layer_names = if (app.enable_validation_layers) @ptrCast(&validation_layers) else null,
+        .enabled_layer_count = if (app.options.enable_validation_layers) @intCast(validation_layers.len) else 0,
+        .pp_enabled_layer_names = if (app.options.enable_validation_layers) @ptrCast(&validation_layers) else null,
     };
-
-    if (supports_coherent_memory_AMD) {
-        app.log(.debug, "Enabled device coherent memory for AMD", .{});
-    }
 
     return try app.vki.createDevice(app.physical_device, &create_info, null);
 }
@@ -124,6 +132,18 @@ pub fn getComputeQueue(app: *const VulkanApp) !vk.Queue {
 pub fn getComputeQueueIndex(app: *const VulkanApp) !u32 {
     const indices: QueueFamilyIndices = try findQueueFamilies(app, app.physical_device);
     return indices.compute_family.?;
+}
+
+fn appendFeatureChain(chain: *?*anyopaque, feature: *anyopaque) void {
+    if (chain.*) |cha| {
+        var current_link: *anyopaque = cha;
+        while (@as(?*vk.PhysicalDeviceFeatures2, @alignCast(@ptrCast(current_link)))) |p_next| {
+            current_link = p_next;
+        }
+        @as(?*vk.PhysicalDeviceFeatures2, @alignCast(@ptrCast(current_link))).?.p_next = feature;
+    } else {
+        chain.* = feature;
+    }
 }
 
 fn supportsCoherentMemoryAMD(app: *const VulkanApp) bool {

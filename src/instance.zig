@@ -15,7 +15,7 @@ pub fn getRequiredExtensions(app: *const VulkanApp) ![][*:0]const u8 {
 }
 
 pub fn createInstance(app: *const VulkanApp) !vk.Instance {
-    if (app.enable_validation_layers) {
+    if (app.options.enable_validation_layers) {
         try checkValidationLayerSupport(app);
     }
 
@@ -30,8 +30,8 @@ pub fn createInstance(app: *const VulkanApp) !vk.Instance {
     const create_info = vk.InstanceCreateInfo{
         .flags = .{},
         .p_application_info = &app_info,
-        .enabled_layer_count = if (app.enable_validation_layers) @intCast(validation_layers.len) else 0,
-        .pp_enabled_layer_names = if (app.enable_validation_layers) @ptrCast(&validation_layers) else null,
+        .enabled_layer_count = if (app.options.enable_validation_layers) @intCast(validation_layers.len) else 0,
+        .pp_enabled_layer_names = if (app.options.enable_validation_layers) @ptrCast(&validation_layers) else null,
         .enabled_extension_count = @intCast(app.instance_extensions.len),
         .pp_enabled_extension_names = app.instance_extensions.ptr,
     };
@@ -51,7 +51,7 @@ fn checkValidationLayerSupport(app: *const VulkanApp) !void {
     try vkAssesrt.withMessage(result, "Failed to enumerate instance layer properties.");
 
     // Print validation layers if debug mode is on
-    if (app.debug_mode and validation_layers.len > 0) {
+    if (app.options.debug_mode and validation_layers.len > 0) {
         std.debug.print("Active validation layers ({d}): \n", .{validation_layers.len});
         for (validation_layers) |val_layer| {
             for (available_layers) |ava_layer| {

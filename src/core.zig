@@ -21,8 +21,13 @@ pub const device_extensions = [_][*:0]const u8{
 };
 
 pub const VulkanAppOptions = struct {
+    const Features = struct {
+        float64: bool = false,
+    };
+
     debug_mode: bool = false,
     enable_validation_layers: bool = false,
+    features: Features = .{},
 };
 
 pub const SharedMemory = struct {
@@ -89,8 +94,7 @@ pub const VulkanApp = struct {
     const Self = @This();
 
     allocator: Allocator,
-    debug_mode: bool,
-    enable_validation_layers: bool,
+    options: VulkanAppOptions = .{},
 
     vulkan_lib: std.DynLib = undefined,
 
@@ -142,8 +146,7 @@ pub const VulkanApp = struct {
 
         var app = VulkanApp{
             .allocator = allocator,
-            .debug_mode = options.debug_mode,
-            .enable_validation_layers = options.enable_validation_layers,
+            .options = options,
             .shared_memories = data,
             .dispatch = dispatch,
         };
@@ -252,7 +255,7 @@ pub const VulkanApp = struct {
     }
 
     pub fn log(app: *const Self, level: std.log.Level, comptime format: []const u8, args: anytype) void {
-        if (app.debug_mode) {
+        if (app.options.debug_mode) {
             switch (level) {
                 .debug => std.log.debug(format, args),
                 .info => std.log.info(format, args),

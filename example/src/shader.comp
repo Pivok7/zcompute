@@ -10,7 +10,11 @@ layout(std430, binding = 1) buffer lay1 {
 };
 
 layout(std430, binding = 2) buffer lay2 {
-    int buf_three[];
+    double buf_three[];
+};
+
+layout(std430, binding = 3) buffer lay3 {
+    int buf_four[];
 };
 
 void main() {
@@ -18,5 +22,6 @@ void main() {
 
     buf_one[id] = buf_one[id] + buf_one[id];
     buf_two[id] = buf_two[id] * buf_two[id];
-    buf_three[id] = int(id) - 4;
+    buf_three[id] = 1.0 / buf_three[id];
+    buf_four[id] = int(id) - 4;
 }
