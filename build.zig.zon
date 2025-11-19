@@ -7,7 +7,7 @@
     .dependencies = .{
         .vulkan_headers = .{
             .url = "https://github.com/KhronosGroup/Vulkan-Headers/archive/v1.4.321.tar.gz",
-            .hash = "N-V-__8AAAkkoQGn5z1yoNVrwqZfnYmZp8AZ5CJgoHRMQI0c",
+            .hash = "N-V-__8AAI7-AQIsx0GGCNZVZDEQ-EhVjVd915WjwOOiSSA-",
         },
         .vulkan = .{
             .url = "git+https://github.com/Snektron/vulkan-zig#8322c9593fc2115156ec8743ba4f3b4547e5eb24",
