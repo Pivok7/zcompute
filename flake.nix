@@ -1,5 +1,5 @@
 {
-  description = "C++ flake";
+  description = "Zig vulkan flake";
 
   inputs.utils.url = "github:numtide/flake-utils";
 
