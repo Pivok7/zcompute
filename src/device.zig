@@ -8,10 +8,18 @@ const validation_layers = core.validation_layers;
 const device_extensions = core.device_extensions;
 
 const QueueFamilyIndices = struct {
-    compute_family: ?u32 = null,
+    compute_bit: ?u32 = null,
+    graphics_bit: ?i32 = null,
 
-    fn isComplete(self: @This()) bool {
-        return (self.compute_family != null);
+    fn isOptimal(self: @This()) bool {
+        return (
+            self.compute_bit != null and
+            self.graphics_bit == null
+        );
+    }
+
+    fn isCapable(self: @This()) bool {
+        return (self.compute_bit != null);
     }
 };
 
@@ -39,7 +47,16 @@ pub fn pickPhysicalDevice(app: *const core.VulkanApp) !vk.PhysicalDevice {
 fn isDeviceSuitable(app: *const VulkanApp, device: vk.PhysicalDevice) !bool {
     const indices: QueueFamilyIndices = try findQueueFamilies(app, device);
 
-    return indices.isComplete();
+    if (indices.isOptimal()) {
+        app.log(.debug, "Selected compute family", .{});
+        return true;
+    } else if (indices.isCapable()) {
+        app.log(.debug, "Selected compute + graphics family", .{});
+        app.log(.warn, "Suboptimal queue family. Running compute + graphics family. Pure compute family is optimal", .{});
+        return true;
+    }
+
+    return false;
 }
 
 fn findQueueFamilies(app: *const VulkanApp, device: vk.PhysicalDevice) !QueueFamilyIndices {
@@ -53,12 +70,33 @@ fn findQueueFamilies(app: *const VulkanApp, device: vk.PhysicalDevice) !QueueFam
 
     app.vki.getPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, available_queue_families.ptr);
 
+    // First try to find optimal queue family
     for (available_queue_families, 0..) |queue_family, i| {
+        indices = .{};
+
         if (queue_family.queue_flags.compute_bit) {
-            indices.compute_family = @intCast(i);
+            indices.compute_bit = @intCast(i);
+        }
+        if (queue_family.queue_flags.graphics_bit) {
+            indices.graphics_bit = @intCast(i);
         }
 
-        if (indices.isComplete()) break;
+        if (indices.isOptimal()) return indices;
+    }
+
+    // Fallback to compute + graphics
+    for (available_queue_families, 0..) |queue_family, i| {
+        indices = .{};
+        if (queue_family.queue_flags.compute_bit) {
+            indices.compute_bit = @intCast(i);
+        }
+        if (queue_family.queue_flags.graphics_bit) {
+            indices.graphics_bit = @intCast(i);
+        }
+
+        if (indices.isCapable()) {
+            return indices;
+        }
     }
 
     return indices;
@@ -70,7 +108,7 @@ pub fn createLogicalDevice(app: *const VulkanApp) !vk.Device {
     var unique_queue_families = std.ArrayList(u32){};
     defer unique_queue_families.deinit(app.allocator);
 
-    const all_queue_families = &[_]u32{ indices.compute_family.? };
+    const all_queue_families = &[_]u32{ indices.compute_bit.? };
 
     for (all_queue_families) |queue_family| {
         for (unique_queue_families.items) |item| {
@@ -126,12 +164,12 @@ pub fn createLogicalDevice(app: *const VulkanApp) !vk.Device {
 
 pub fn getComputeQueue(app: *const VulkanApp) !vk.Queue {
     const indices: QueueFamilyIndices = try findQueueFamilies(app, app.physical_device);
-    return app.vkd.getDeviceQueue(app.device, indices.compute_family.?, 0);
+    return app.vkd.getDeviceQueue(app.device, indices.compute_bit.?, 0);
 }
 
 pub fn getComputeQueueIndex(app: *const VulkanApp) !u32 {
     const indices: QueueFamilyIndices = try findQueueFamilies(app, app.physical_device);
-    return indices.compute_family.?;
+    return indices.compute_bit.?;
 }
 
 fn appendFeatureChain(chain: *?*anyopaque, feature: *anyopaque) void {

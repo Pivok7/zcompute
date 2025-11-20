@@ -255,13 +255,11 @@ pub const VulkanApp = struct {
     }
 
     pub fn log(app: *const Self, level: std.log.Level, comptime format: []const u8, args: anytype) void {
-        if (app.options.debug_mode) {
-            switch (level) {
-                .debug => std.log.debug(format, args),
-                .info => std.log.info(format, args),
-                .warn => std.log.info(format, args),
-                .err => std.log.err(format, args),
-            }
+        switch (level) {
+            .debug => if (app.options.debug_mode) std.log.debug(format, args),
+            .info => if (app.options.debug_mode) std.log.info(format, args),
+            .warn => std.log.warn(format, args),
+            .err => std.log.err(format, args),
         }
     }
 };
