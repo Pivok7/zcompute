@@ -2,10 +2,10 @@ const std = @import("std");
 const vk = @import("vulkan");
 const core = @import("core.zig");
 
-const VulkanApp = core.VulkanApp;
+const App = core.VulkanApp;
 const VkAssert = core.VkAssert;
 
-pub fn createDescriptorSetLayout(app: *const VulkanApp) !vk.DescriptorSetLayout {
+pub fn createDescriptorSetLayout(app: *const App) !vk.DescriptorSetLayout {
     var layout_bindings = std.ArrayList(vk.DescriptorSetLayoutBinding){};
     defer layout_bindings.deinit(app.allocator);
 
@@ -23,29 +23,30 @@ pub fn createDescriptorSetLayout(app: *const VulkanApp) !vk.DescriptorSetLayout 
         .p_bindings = @ptrCast(layout_bindings.items.ptr),
     };
 
-    return try app.vkd.createDescriptorSetLayout(
-        app.device,
+    return try app.gpu.vkd.createDescriptorSetLayout(
+        app.gpu.device,
         &create_info,
         null
     );
 }
 
-pub fn createPipelineLayout(app: *const VulkanApp) !vk.PipelineLayout {
+pub fn createPipelineLayout(app: *const App) !vk.PipelineLayout {
     const create_info = vk.PipelineLayoutCreateInfo{
         .set_layout_count = 1,
         .p_set_layouts = @ptrCast(&app.descriptor_set_layout),
     };
 
-    return app.vkd.createPipelineLayout(app.device, &create_info, null);
+    return app.gpu.vkd.createPipelineLayout(app.gpu.device, &create_info, null);
 }
 
-pub fn createPipelineCache(app: *const VulkanApp) !vk.PipelineCache {
+pub fn createPipelineCache(app: *const App) !vk.PipelineCache {
+
     const create_info = vk.PipelineCacheCreateInfo{};
 
-    return app.vkd.createPipelineCache(app.device, &create_info, null);
+    return app.gpu.vkd.createPipelineCache(app.gpu.device, &create_info, null);
 }
 
-pub fn CreatePipeline(app: *const VulkanApp) !vk.Pipeline {
+pub fn CreatePipeline(app: *const App) !vk.Pipeline {
     const shader_create_info = vk.PipelineShaderStageCreateInfo{
         .stage = .{ .compute_bit = true },
         .module = app.shader_module,
@@ -60,8 +61,8 @@ pub fn CreatePipeline(app: *const VulkanApp) !vk.Pipeline {
 
     var pipeline: vk.Pipeline = .null_handle;
 
-    const result = try app.vkd.createComputePipelines(
-        app.device,
+    const result = try app.gpu.vkd.createComputePipelines(
+        app.gpu.device,
         app.pipeline_cache,
         1,
         @ptrCast(&pipeline_create_info),
@@ -74,7 +75,7 @@ pub fn CreatePipeline(app: *const VulkanApp) !vk.Pipeline {
     return pipeline;
 }
 
-pub fn createDescriptorPool(app: *const VulkanApp) !vk.DescriptorPool {
+pub fn createDescriptorPool(app: *const App) !vk.DescriptorPool {
     const pool_sizes = [_]vk.DescriptorPoolSize{
         .{
             .type = .storage_buffer,
@@ -88,10 +89,10 @@ pub fn createDescriptorPool(app: *const VulkanApp) !vk.DescriptorPool {
         .max_sets = @intCast(app.shared_memories.len),
     };
 
-    return app.vkd.createDescriptorPool(app.device, &create_info, null);
+    return app.gpu.vkd.createDescriptorPool(app.gpu.device, &create_info, null);
 }
 
-pub fn createDescriptorSet(app: *const VulkanApp) !vk.DescriptorSet {
+pub fn createDescriptorSet(app: *const App) !vk.DescriptorSet {
     const allocate_info = vk.DescriptorSetAllocateInfo{
         .descriptor_pool = app.descriptor_pool,
         .descriptor_set_count = 1,
@@ -101,8 +102,8 @@ pub fn createDescriptorSet(app: *const VulkanApp) !vk.DescriptorSet {
     const descriptor_sets = try app.allocator.alloc(vk.DescriptorSet, 1);
     defer app.allocator.free(descriptor_sets);
 
-    try app.vkd.allocateDescriptorSets(
-        app.device,
+    try app.gpu.vkd.allocateDescriptorSets(
+        app.gpu.device,
         &allocate_info,
         @ptrCast(descriptor_sets.ptr)
     );
@@ -136,8 +137,8 @@ pub fn createDescriptorSet(app: *const VulkanApp) !vk.DescriptorSet {
         });
     }
 
-    app.vkd.updateDescriptorSets(
-        app.device,
+    app.gpu.vkd.updateDescriptorSets(
+        app.gpu.device,
         @intCast(write_descriptor_sets.items.len),
         @ptrCast(write_descriptor_sets.items.ptr),
         0,

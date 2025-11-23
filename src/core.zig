@@ -20,16 +20,6 @@ pub const validation_layers = [_][*:0]const u8{
 pub const device_extensions = [_][*:0]const u8{
 };
 
-pub const VulkanAppOptions = struct {
-    const Features = struct {
-        float64: bool = false,
-    };
-
-    debug_mode: bool = false,
-    enable_validation_layers: bool = false,
-    features: Features = .{},
-};
-
 pub const SharedMemory = struct {
     const Self = @This();
 
@@ -90,11 +80,21 @@ pub const VkAssert = struct {
     }
 };
 
-pub const VulkanApp = struct {
+pub const VulkanGPUOptions = struct {
+    const Features = struct {
+        float64: bool = false,
+    };
+
+    debug_mode: bool = false,
+    enable_validation_layers: bool = false,
+    features: Features = .{},
+};
+
+pub const VulkanGPU = struct {
     const Self = @This();
 
     allocator: Allocator,
-    options: VulkanAppOptions = .{},
+    options: VulkanGPUOptions = .{},
 
     vulkan_lib: std.DynLib = undefined,
 
@@ -110,6 +110,74 @@ pub const VulkanApp = struct {
 
     compute_queue: vk.Queue = .null_handle,
     compute_queue_index: u32 = undefined,
+
+    pub fn init(
+        allocator: Allocator,
+        options: VulkanGPUOptions,
+    ) !Self {
+        var dev = VulkanGPU{
+            .allocator = allocator,
+            .options = options,
+        };
+
+        dev.vulkan_lib = try loader.loadVulkan();
+        const vkGetInstanceProcAddr = try loader.loadVkGetInstanceProcAddr(&dev.vulkan_lib);
+        dev.log(.debug, "Loaded Vulkan library", .{});
+
+        dev.vkb = vk.BaseWrapper.load(vkGetInstanceProcAddr);
+
+        dev.instance_extensions = try instance.getRequiredExtensions(&dev);
+        dev.instance = try instance.createInstance(&dev);
+        dev.log(.info, "Created Vulkan instance", .{});
+
+        dev.vki = vk.InstanceWrapper.load(dev.instance, dev.vkb.dispatch.vkGetInstanceProcAddr.?);
+
+        dev.physical_device = try device.pickPhysicalDevice(&dev);
+        dev.log(.info, "Device: {s}", .{dev.vki.getPhysicalDeviceProperties(dev.physical_device).device_name});
+
+        dev.device = try device.createLogicalDevice(&dev);
+        dev.log(.debug, "Created logical device", .{});
+
+        dev.vkd = vk.DeviceWrapper.load(dev.device, dev.vki.dispatch.vkGetDeviceProcAddr.?);
+
+        dev.compute_queue = try device.getComputeQueue(&dev);
+        dev.compute_queue_index = try device.getComputeQueueIndex(&dev);
+
+        return dev;
+    }
+
+    pub fn deinit(dev: *Self) void {
+        dev.vkd.destroyDevice(dev.device, null);
+        dev.vki.destroyInstance(dev.instance, null);
+        dev.log(.info, "Destroyed Vulkan instance", .{});
+
+        dev.vulkan_lib.close();
+        dev.log(.debug, "Unloaded Vulkan library", .{});
+
+        dev.allocator.free(dev.instance_extensions);
+    }
+
+    pub fn log(dev: *const Self, level: std.log.Level, comptime format: []const u8, args: anytype) void {
+        switch (level) {
+            .debug => if (dev.options.debug_mode) std.log.debug("(gpu) " ++ format, args),
+            .info => if (dev.options.debug_mode) std.log.info("(gpu) " ++ format, args),
+            .warn => std.log.warn("(gpu) " ++ format, args),
+            .err => std.log.err("(gpu) " ++ format, args),
+        }
+    }
+};
+
+pub const VulkanAppOptions = struct {
+    debug_mode: bool = false,
+};
+
+pub const VulkanApp = struct {
+    const Self = @This();
+
+    allocator: Allocator,
+    options: VulkanAppOptions = .{},
+
+    gpu: *VulkanGPU = undefined,
 
     shared_memories: []const SharedMemory,
     dispatch: Dispatch,
@@ -131,10 +199,11 @@ pub const VulkanApp = struct {
 
     pub fn init(
         allocator: Allocator,
-        options: VulkanAppOptions,
+        gpu: *VulkanGPU,
         shader_path: []const u8,
         data: []const SharedMemory,
         dispatch: Dispatch,
+        options: VulkanAppOptions,
     ) !Self {
         std.fs.cwd().access(shader_path, .{}) catch |e| switch (e) {
             error.FileNotFound => {
@@ -146,33 +215,11 @@ pub const VulkanApp = struct {
 
         var app = VulkanApp{
             .allocator = allocator,
-            .options = options,
+            .gpu = gpu,
             .shared_memories = data,
             .dispatch = dispatch,
+            .options = options,
         };
-
-        app.vulkan_lib = try loader.loadVulkan();
-        const vkGetInstanceProcAddr = try loader.loadVkGetInstanceProcAddr(&app.vulkan_lib);
-        app.log(.debug, "Loaded Vulkan library", .{});
-
-        app.vkb = vk.BaseWrapper.load(vkGetInstanceProcAddr);
-
-        app.instance_extensions = try instance.getRequiredExtensions(&app);
-        app.instance = try instance.createInstance(&app);
-        app.log(.info, "Created Vulkan instance", .{});
-
-        app.vki = vk.InstanceWrapper.load(app.instance, app.vkb.dispatch.vkGetInstanceProcAddr.?);
-
-        app.physical_device = try device.pickPhysicalDevice(&app);
-        app.log(.info, "Device: {s}", .{app.vki.getPhysicalDeviceProperties(app.physical_device).device_name});
-
-        app.device = try device.createLogicalDevice(&app);
-        app.log(.debug, "Created logical device", .{});
-
-        app.vkd = vk.DeviceWrapper.load(app.device, app.vki.dispatch.vkGetDeviceProcAddr.?);
-
-        app.compute_queue = try device.getComputeQueue(&app);
-        app.compute_queue_index = try device.getComputeQueueIndex(&app);
 
         try memory.createBuffer(&app);
         app.log(.debug, "Created memory buffer", .{});
@@ -196,32 +243,24 @@ pub const VulkanApp = struct {
     }
 
     pub fn deinit(app: *Self) void {
-        app.vkd.destroyCommandPool(app.device, app.command_pool, null);
-        app.vkd.destroyPipeline(app.device, app.compute_pipeline, null);
+        app.gpu.vkd.destroyCommandPool(app.gpu.device, app.command_pool, null);
+        app.gpu.vkd.destroyPipeline(app.gpu.device, app.compute_pipeline, null);
 
-        app.vkd.destroyPipelineCache(app.device, app.pipeline_cache, null);
-        app.vkd.destroyPipelineLayout(app.device, app.pipeline_layout, null);
-        app.vkd.destroyDescriptorPool(app.device, app.descriptor_pool, null);
-        app.vkd.destroyDescriptorSetLayout(app.device, app.descriptor_set_layout, null);
+        app.gpu.vkd.destroyPipelineCache(app.gpu.device, app.pipeline_cache, null);
+        app.gpu.vkd.destroyPipelineLayout(app.gpu.device, app.pipeline_layout, null);
+        app.gpu.vkd.destroyDescriptorPool(app.gpu.device, app.descriptor_pool, null);
+        app.gpu.vkd.destroyDescriptorSetLayout(app.gpu.device, app.descriptor_set_layout, null);
 
-        app.vkd.destroyShaderModule(app.device, app.shader_module, null);
+        app.gpu.vkd.destroyShaderModule(app.gpu.device, app.shader_module, null);
 
         for (app.device_memories.items) |*mem| {
-            app.vkd.freeMemory(app.device, mem.*, null);
+            app.gpu.vkd.freeMemory(app.gpu.device, mem.*, null);
         }
 
         for (app.device_buffers.items) |*buf| {
-            app.vkd.destroyBuffer(app.device, buf.*, null);
+            app.gpu.vkd.destroyBuffer(app.gpu.device, buf.*, null);
         }
 
-        app.vkd.destroyDevice(app.device, null);
-        app.vki.destroyInstance(app.instance, null);
-        app.log(.info, "Destroyed Vulkan instance", .{});
-
-        app.vulkan_lib.close();
-        app.log(.debug, "Unloaded Vulkan library", .{});
-
-        app.allocator.free(app.instance_extensions);
         app.device_memories.deinit(app.allocator);
         app.device_buffers.deinit(app.allocator);
     }
@@ -235,12 +274,12 @@ pub const VulkanApp = struct {
         const shdr_mem = app.shared_memories[index];
 
         const buffer_slice = @as([*]T, @ptrCast(@alignCast(
-            try app.vkd.mapMemory(app.device, dev_mem, 0, shdr_mem.size(), .{})
+            try app.gpu.vkd.mapMemory(app.gpu.device, dev_mem, 0, shdr_mem.size(), .{})
         )))[0..shdr_mem.elem_num];
 
         @memcpy(buf, buffer_slice);
 
-        app.vkd.unmapMemory(app.device, dev_mem);
+        app.gpu.vkd.unmapMemory(app.gpu.device, dev_mem);
     }
 
     pub fn getDataAlloc(app: *const Self, allocator: Allocator, index: usize, T: type) ![]T {
@@ -253,10 +292,10 @@ pub const VulkanApp = struct {
 
     pub fn log(app: *const Self, level: std.log.Level, comptime format: []const u8, args: anytype) void {
         switch (level) {
-            .debug => if (app.options.debug_mode) std.log.debug(format, args),
-            .info => if (app.options.debug_mode) std.log.info(format, args),
-            .warn => std.log.warn(format, args),
-            .err => std.log.err(format, args),
+            .debug => if (app.options.debug_mode) std.log.debug("(app) " ++ format, args),
+            .info => if (app.options.debug_mode) std.log.info("(app) " ++ format, args),
+            .warn => std.log.warn("(app) " ++ format, args),
+            .err => std.log.err("(app) " ++ format, args),
         }
     }
 };

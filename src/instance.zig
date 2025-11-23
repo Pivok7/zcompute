@@ -3,20 +3,20 @@ const vk = @import("vulkan");
 const c = @import("c.zig");
 const core = @import("core.zig");
 
-const VulkanApp = core.VulkanApp;
+const GPU = core.VulkanGPU;
 const vkAssesrt = core.VkAssert;
 const validation_layers = core.validation_layers;
 
-pub fn getRequiredExtensions(app: *const VulkanApp) ![][*:0]const u8 {
+pub fn getRequiredExtensions(gpu: *const GPU) ![][*:0]const u8 {
     var extensions = std.ArrayList([*:0]const u8){};
-    try extensions.append(app.allocator, vk.extensions.ext_debug_utils.name);
+    try extensions.append(gpu.allocator, vk.extensions.ext_debug_utils.name);
 
-    return try extensions.toOwnedSlice(app.allocator);
+    return try extensions.toOwnedSlice(gpu.allocator);
 }
 
-pub fn createInstance(app: *const VulkanApp) !vk.Instance {
-    if (app.options.enable_validation_layers) {
-        try checkValidationLayerSupport(app);
+pub fn createInstance(gpu: *const GPU) !vk.Instance {
+    if (gpu.options.enable_validation_layers) {
+        try checkValidationLayerSupport(gpu);
     }
 
     const app_info = vk.ApplicationInfo{
@@ -30,28 +30,28 @@ pub fn createInstance(app: *const VulkanApp) !vk.Instance {
     const create_info = vk.InstanceCreateInfo{
         .flags = .{},
         .p_application_info = &app_info,
-        .enabled_layer_count = if (app.options.enable_validation_layers) @intCast(validation_layers.len) else 0,
-        .pp_enabled_layer_names = if (app.options.enable_validation_layers) @ptrCast(&validation_layers) else null,
-        .enabled_extension_count = @intCast(app.instance_extensions.len),
-        .pp_enabled_extension_names = app.instance_extensions.ptr,
+        .enabled_layer_count = if (gpu.options.enable_validation_layers) @intCast(validation_layers.len) else 0,
+        .pp_enabled_layer_names = if (gpu.options.enable_validation_layers) @ptrCast(&validation_layers) else null,
+        .enabled_extension_count = @intCast(gpu.instance_extensions.len),
+        .pp_enabled_extension_names = gpu.instance_extensions.ptr,
     };
 
-    return try app.vkb.createInstance(&create_info, null);
+    return try gpu.vkb.createInstance(&create_info, null);
 }
 
-fn checkValidationLayerSupport(app: *const VulkanApp) !void {
+fn checkValidationLayerSupport(gpu: *const GPU) !void {
     var layer_count: u32 = 0;
-    var result = try app.vkb.enumerateInstanceLayerProperties(&layer_count, null);
+    var result = try gpu.vkb.enumerateInstanceLayerProperties(&layer_count, null);
     try vkAssesrt.withMessage(result, "Failed to enumerate instance layer properties.");
 
-    const available_layers = try app.allocator.alloc(vk.LayerProperties, layer_count);
-    defer app.allocator.free(available_layers);
+    const available_layers = try gpu.allocator.alloc(vk.LayerProperties, layer_count);
+    defer gpu.allocator.free(available_layers);
 
-    result = try app.vkb.enumerateInstanceLayerProperties(&layer_count, @ptrCast(available_layers));
+    result = try gpu.vkb.enumerateInstanceLayerProperties(&layer_count, @ptrCast(available_layers));
     try vkAssesrt.withMessage(result, "Failed to enumerate instance layer properties.");
 
     // Print validation layers if debug mode is on
-    if (app.options.debug_mode and validation_layers.len > 0) {
+    if (gpu.options.debug_mode and validation_layers.len > 0) {
         std.debug.print("Active validation layers ({d}): \n", .{validation_layers.len});
         for (validation_layers) |val_layer| {
             for (available_layers) |ava_layer| {
