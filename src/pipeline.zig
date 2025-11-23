@@ -46,14 +46,14 @@ pub fn createPipelineCache(app: *const VulkanApp) !vk.PipelineCache {
 }
 
 pub fn CreatePipeline(app: *const VulkanApp) !vk.Pipeline {
-    const shared_create_info = vk.PipelineShaderStageCreateInfo{
+    const shader_create_info = vk.PipelineShaderStageCreateInfo{
         .stage = .{ .compute_bit = true },
         .module = app.shader_module,
         .p_name = "main",
     };
 
     const pipeline_create_info = vk.ComputePipelineCreateInfo{
-        .stage = shared_create_info,
+        .stage = shader_create_info,
         .layout = app.pipeline_layout,
         .base_pipeline_index = 0,
     };

@@ -51,6 +51,7 @@ pub fn createBuffer(app: *VulkanApp) !void {
         })) {
             mem_heap_size = mem_properties.memory_heaps[mem_type.heap_index].size;
             mem_type_index = @intCast(i);
+            break;
         }
     }
 
@@ -79,13 +80,13 @@ pub fn createBuffer(app: *VulkanApp) !void {
         try app.device_memories.append(app.allocator, buffer_memory);
     }
 
-    for (app.device_memories.items, app.shared_memories, 0..) |dev_mem, shdr_mem, i| {
-        if (shdr_mem.data) |data| {
+    for (app.device_memories.items, app.shared_memories, 0..) |dev_mem, shrd_mem, i| {
+        if (shrd_mem.data) |data| {
             const buffer_slice = @as([*]u8, @ptrCast(
-                try app.vkd.mapMemory(app.device, dev_mem, 0, shdr_mem.size(), .{})
-            ))[0..shdr_mem.size()];
+                try app.vkd.mapMemory(app.device, dev_mem, 0, shrd_mem.size(), .{})
+            ))[0..shrd_mem.size()];
 
-            const data_slice = @as([*]const u8, @ptrCast(data))[0..shdr_mem.size()];
+            const data_slice = @as([*]const u8, @ptrCast(data))[0..shrd_mem.size()];
 
             @memcpy(buffer_slice, data_slice);
 

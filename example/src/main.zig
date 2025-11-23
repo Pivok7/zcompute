@@ -18,7 +18,8 @@ pub fn main() !void {
     var app = try zcomp.App.init(
         allocator,
         .{
-            .enable_validation_layers = true,
+            .enable_validation_layers = false,
+            .debug_mode = false,
             .features = .{ .float64 = true },
         },
         "src/shader.spv",

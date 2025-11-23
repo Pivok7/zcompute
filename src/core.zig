@@ -114,8 +114,8 @@ pub const VulkanApp = struct {
     shared_memories: []const SharedMemory,
     dispatch: Dispatch,
 
-    device_memories: std.ArrayList(vk.DeviceMemory) = undefined,
-    device_buffers: std.ArrayList(vk.Buffer) = undefined,
+    device_memories: std.ArrayList(vk.DeviceMemory) = .{},
+    device_buffers: std.ArrayList(vk.Buffer) = .{},
 
     shader_module: vk.ShaderModule = .null_handle,
 
@@ -173,9 +173,6 @@ pub const VulkanApp = struct {
 
         app.compute_queue = try device.getComputeQueue(&app);
         app.compute_queue_index = try device.getComputeQueueIndex(&app);
-
-        app.device_memories = std.ArrayList(vk.DeviceMemory){};
-        app.device_buffers = std.ArrayList(vk.Buffer){};
 
         try memory.createBuffer(&app);
         app.log(.debug, "Created memory buffer", .{});
