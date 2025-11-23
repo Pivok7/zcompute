@@ -2,6 +2,16 @@ const std = @import("std");
 const zcomp = @import("zcompute");
 const SharedMemory = zcomp.SharedMemory;
 
+pub const editWrapper = struct {
+    // Using variable outside the function
+    const outside_var: u32 = 5;
+
+    pub fn editFunc(data: []u8, elem_num: u32, _: usize) void {
+        const buffer_slice = @as([*]u32, @ptrCast(@alignCast(data)))[0..elem_num];
+        buffer_slice[elem_num - 1] += outside_var;
+    }
+};
+
 pub fn main() !void {
     var dba = std.heap.DebugAllocator(.{}){};
     defer _ = dba.deinit();
@@ -38,10 +48,12 @@ pub fn main() !void {
     );
     defer app.deinit();
 
+    // Example of editing the memory
+    // Editing takes place in a function called editFunc
+    try app.editData(0, editWrapper.editFunc);
+
     // Run the application
-    for (0..1) |_| {
-        try app.run();
-    }
+    try app.run();
 
     // Collect output
     std.debug.print("Output:\n", .{});

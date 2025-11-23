@@ -269,13 +269,31 @@ pub const VulkanApp = struct {
         try command.submitWork(app);
     }
 
+    /// This function takes another function as a parameter
+    /// which should implement code for editing the buffer.
+    /// It's parameters are:
+    /// -> u8[] - buffer
+    /// -> u32 - number of elements
+    /// -> usize - element size
+    pub fn editData(app: *const Self, index: usize, func: *const fn([]u8, u32, usize) void) !void {
+        const dev_mem = app.device_memories.items[index];
+        const shrd_mem = app.shared_memories[index];
+        const buffer_slice = @as([*]u8, @ptrCast(
+            try app.gpu.vkd.mapMemory(app.gpu.device, dev_mem, 0, shrd_mem.size(), .{})
+        ))[0..shrd_mem.size()];
+
+        func(buffer_slice, shrd_mem.elem_num, shrd_mem.elem_size);
+
+        app.gpu.vkd.unmapMemory(app.gpu.device, dev_mem);
+    }
+
     pub fn getData(app: *const Self, buf: anytype, index: usize, T: type) !void {
         const dev_mem = app.device_memories.items[index];
-        const shdr_mem = app.shared_memories[index];
+        const shrd_mem = app.shared_memories[index];
 
         const buffer_slice = @as([*]T, @ptrCast(@alignCast(
-            try app.gpu.vkd.mapMemory(app.gpu.device, dev_mem, 0, shdr_mem.size(), .{})
-        )))[0..shdr_mem.elem_num];
+            try app.gpu.vkd.mapMemory(app.gpu.device, dev_mem, 0, shrd_mem.size(), .{})
+        )))[0..shrd_mem.elem_num];
 
         @memcpy(buf, buffer_slice);
 
