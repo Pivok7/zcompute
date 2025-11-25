@@ -177,7 +177,7 @@ pub const VulkanApp = struct {
     allocator: Allocator,
     options: VulkanAppOptions = .{},
 
-    gpu: *VulkanGPU = undefined,
+    gpu: *const VulkanGPU = undefined,
 
     shared_memories: []const SharedMemory,
     dispatch: Dispatch,
@@ -199,7 +199,7 @@ pub const VulkanApp = struct {
 
     pub fn init(
         allocator: Allocator,
-        gpu: *VulkanGPU,
+        gpu: *const VulkanGPU,
         shader_path: []const u8,
         data: []const SharedMemory,
         dispatch: Dispatch,

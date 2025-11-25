@@ -1,5 +1,5 @@
 {
-  description = "Zig vulkan flake";
+  description = "Pim flake";
 
   inputs.utils.url = "github:numtide/flake-utils";
 

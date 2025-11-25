@@ -1,7 +1,7 @@
 .{
     .name = .zcompute,
-    .version = "0.2.1",
-    .minimum_zig_version = "0.15.1",
+    .version = "0.2.2",
+    .minimum_zig_version = "0.15.2",
     .fingerprint = 0x3562293819c06318, // Changing this has security and trust implications.
 
     .dependencies = .{
