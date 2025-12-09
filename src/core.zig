@@ -12,47 +12,13 @@ const Allocator = std.mem.Allocator;
 const BaseWrapper = vk.BaseDispatch;
 const InstanceWrapper = vk.InstanceDispatch;
 const DeviceWrapper = vk.DeviceDispatch;
+pub const SharedMemory = @import("shared_memory.zig").SharedMemory;
 
 pub const validation_layers = [_][*:0]const u8{
     "VK_LAYER_KHRONOS_validation",
 };
 
 pub const device_extensions = [_][*:0]const u8{
-};
-
-pub const SharedMemory = struct {
-    const Self = @This();
-
-    data: ?*const anyopaque = null,
-    elem_num: u32,
-    elem_size: usize,
-
-    pub fn size(self: *const Self) usize {
-        return self.elem_num * self.elem_size;
-    }
-
-    pub fn newEmpty(T: type, len: u32) !Self {
-        if (len == 0) return error.LengthTooShort;
-        if (@sizeOf(T) == 0) return error.ZeroSizeType;
-
-        return .{
-            .elem_num = len,
-            .elem_size = @sizeOf(T),
-        };
-    }
-
-    pub fn newSlice(slice: anytype) !Self {
-        if (slice.len == 0) return error.NotSlice;
-
-        const child_type = @typeInfo(@TypeOf(slice)).pointer.child;
-        if (@sizeOf(child_type) == 0) return error.ZeroSizeType;
-
-        return .{
-            .data = slice.ptr,
-            .elem_num = @intCast(slice.len),
-            .elem_size = @sizeOf(child_type),
-        };
-    }
 };
 
 pub const Dispatch = struct {
