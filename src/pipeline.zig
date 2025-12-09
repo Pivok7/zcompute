@@ -40,7 +40,6 @@ pub fn createPipelineLayout(app: *const App) !vk.PipelineLayout {
 }
 
 pub fn createPipelineCache(app: *const App) !vk.PipelineCache {
-
     const create_info = vk.PipelineCacheCreateInfo{};
 
     return app.gpu.vkd.createPipelineCache(app.gpu.device, &create_info, null);
