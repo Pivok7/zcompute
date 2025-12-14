@@ -27,9 +27,7 @@ pub fn createCommandBuffer(app: *const App) !vk.CommandBuffer {
 
     const command_buffer = command_buffers[0];
 
-    const begin_info = vk.CommandBufferBeginInfo{
-        .flags = .{ .one_time_submit_bit = true },
-    };
+    const begin_info = vk.CommandBufferBeginInfo{};
 
     try app.gpu.vkd.beginCommandBuffer(command_buffer, &begin_info);
     app.gpu.vkd.cmdBindPipeline(command_buffer, .compute, app.compute_pipeline);
