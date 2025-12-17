@@ -26,7 +26,7 @@ pub fn build(b: *std.Build) void {
     // Shader compilation
     const compile_comp_shader = b.addSystemCommand(&.{
         "slangc",
-        "src/shader.comp",
+        "src/shader.slang",
         "-target", "spirv",
         "-o", "src/shader.spv",
     });
