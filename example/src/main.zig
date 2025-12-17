@@ -7,6 +7,7 @@ pub const editWrapper = struct {
     const outside_var: u32 = 5;
 
     pub fn editFunc(data: []u8, elem_num: u32, _: usize) void {
+        // Add 5 to last element
         const buffer_slice = @as([]u32, @alignCast(@ptrCast(data)));
         buffer_slice[elem_num - 1] += outside_var;
     }
