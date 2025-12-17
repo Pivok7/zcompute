@@ -32,7 +32,7 @@ pub fn build(b: *std.Build) void {
     });
 
     exe.step.dependOn(&compile_comp_shader.step);
-    if (optimize == .Debug) try buildLog("compiled \"shader.comp\"\n", .{});
+    if (optimize == .Debug) try buildLog("compiled \"shader.slang\"\n", .{});
 
     // Run step
     const run_cmd = b.addRunArtifact(exe);
