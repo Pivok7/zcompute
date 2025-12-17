@@ -19,12 +19,13 @@
           packages = with pkgs; [
             nushell
             zig
-            shaderc
+	    shader-slang
           ];
 
           shellHook = ''
             echo "nushell   `nu -v`"
             echo "zig       `zig version`"
+            echo -n "slangc    "; slangc -v
             exec nu --config ./config.nu
           '';
 

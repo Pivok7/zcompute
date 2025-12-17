@@ -25,10 +25,10 @@ pub fn build(b: *std.Build) void {
 
     // Shader compilation
     const compile_comp_shader = b.addSystemCommand(&.{
-        "glslc",
+        "slangc",
         "src/shader.comp",
-        "-o",
-        "src/shader.spv",
+        "-target", "spirv",
+        "-o", "src/shader.spv",
     });
 
     exe.step.dependOn(&compile_comp_shader.step);

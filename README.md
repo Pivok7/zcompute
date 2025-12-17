@@ -6,11 +6,11 @@ Simple Vulkan library for running compute shaders on the GPU
 
 You will need:
 
-* Zig compiler (latest stable version)
+* Zig compiler (0.15.2)
 
 * Vulkan SDK
 
-* glslc or other shader compiler <br>
+* slangc (Slang shader compiler) <br>
 
 Fetch:
 ```bash
