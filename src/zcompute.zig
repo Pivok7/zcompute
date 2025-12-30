@@ -1,6 +1,6 @@
 const core = @import("core.zig");
 
-pub const SharedMemory = core.SharedMemory;
+pub const SharedBuffer = core.SharedBuffer;
 pub const Dispatch = core.Dispatch;
 pub const GPU = core.VulkanGPU;
 pub const GPUOptions = core.VulkanGPUOptions;

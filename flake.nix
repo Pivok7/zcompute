@@ -1,15 +1,18 @@
 {
   description = "Pim flake";
 
-  inputs.utils.url = "github:numtide/flake-utils";
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
+  };
 
   outputs =
     {
       self,
       nixpkgs,
-      utils,
+      flake-utils,
     }:
-    utils.lib.eachDefaultSystem (
+    flake-utils.lib.eachDefaultSystem (
       system:
       let
         pkgs = import nixpkgs { inherit system; };
@@ -18,7 +21,7 @@
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
             nushell
-            zig
+            zig_0_15
 	    shader-slang
           ];
 

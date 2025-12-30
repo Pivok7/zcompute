@@ -12,7 +12,7 @@ const Allocator = std.mem.Allocator;
 const BaseWrapper = vk.BaseDispatch;
 const InstanceWrapper = vk.InstanceDispatch;
 const DeviceWrapper = vk.DeviceDispatch;
-pub const SharedMemory = @import("shared_memory.zig").SharedMemory;
+pub const SharedBuffer = @import("shared_memory.zig").SharedBuffer;
 
 pub const validation_layers = [_][*:0]const u8{
     "VK_LAYER_KHRONOS_validation",
@@ -145,7 +145,7 @@ pub const VulkanApp = struct {
 
     gpu: *const VulkanGPU = undefined,
 
-    shared_memories: []const SharedMemory,
+    shared_memories: []const SharedBuffer,
     dispatch: Dispatch,
 
     device_memories: std.ArrayList(vk.DeviceMemory) = .{},
@@ -167,10 +167,23 @@ pub const VulkanApp = struct {
         allocator: Allocator,
         gpu: *const VulkanGPU,
         shader_path: []const u8,
-        data: []const SharedMemory,
+        data: []const SharedBuffer,
         dispatch: Dispatch,
         options: VulkanAppOptions,
     ) !Self {
+        var binding_set = std.AutoHashMap(u32, void).init(
+            allocator
+        );
+        defer binding_set.deinit();
+
+        for (data) |*shrd_mem| {
+            const res = try binding_set.fetchPut(shrd_mem.binding, {});
+            if (res) |e| {
+                std.log.err("Found duplicate binding: {d}", .{e.key});
+                return error.DuplicateBinding;
+            }
+        }
+
         std.fs.cwd().access(shader_path, .{}) catch |e| switch (e) {
             error.FileNotFound => {
                 std.log.err("File: {s} not found\n", .{shader_path});

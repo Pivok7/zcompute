@@ -9,9 +9,9 @@ pub fn createDescriptorSetLayout(app: *const App) !vk.DescriptorSetLayout {
     var layout_bindings = std.ArrayList(vk.DescriptorSetLayoutBinding){};
     defer layout_bindings.deinit(app.allocator);
 
-    for (0..app.shared_memories.len) |i| {
+    for (app.shared_memories) |*shrd_mem| {
         try layout_bindings.append(app.allocator, .{
-            .binding = @intCast(i),
+            .binding = shrd_mem.binding,
             .descriptor_type = .storage_buffer,
             .descriptor_count = 1,
             .stage_flags = .{ .compute_bit = true },
@@ -123,10 +123,10 @@ pub fn createDescriptorSet(app: *const App) !vk.DescriptorSet {
     var write_descriptor_sets = std.ArrayList(vk.WriteDescriptorSet){};
     defer write_descriptor_sets.deinit(app.allocator);
 
-    for (buffer_infos.items, 0..) |*buffer_info, i| {
+    for (buffer_infos.items, app.shared_memories) |*buffer_info, *shrd_mem| {
         try write_descriptor_sets.append(app.allocator, .{
             .dst_set = descriptor_set,
-            .dst_binding = @intCast(i),
+            .dst_binding = shrd_mem.binding,
             .dst_array_element = 0,
             .descriptor_count = 1,
             .descriptor_type = .storage_buffer,
