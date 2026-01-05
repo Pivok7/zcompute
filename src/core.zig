@@ -7,12 +7,13 @@ const memory = @import("memory.zig");
 const shader = @import("shader.zig");
 const pipeline = @import("pipeline.zig");
 const command = @import("command.zig");
+const sm = @import("shared_memory.zig");
 
 const Allocator = std.mem.Allocator;
 const BaseWrapper = vk.BaseDispatch;
 const InstanceWrapper = vk.InstanceDispatch;
 const DeviceWrapper = vk.DeviceDispatch;
-pub const SharedBuffer = @import("shared_memory.zig").SharedBuffer;
+pub const SharedMemory = sm.SharedMemory;
 
 pub const validation_layers = [_][*:0]const u8{
     "VK_LAYER_KHRONOS_validation",
@@ -46,21 +47,21 @@ pub const VkAssert = struct {
     }
 };
 
-pub const VulkanGPUOptions = struct {
-    const Features = struct {
-        float64: bool = false,
+pub const VulkanGPU = struct {
+    pub const Options = struct {
+        const Features = struct {
+            float64: bool = false,
+        };
+
+        debug_mode: bool = false,
+        enable_validation_layers: bool = false,
+        features: Features = .{},
     };
 
-    debug_mode: bool = false,
-    enable_validation_layers: bool = false,
-    features: Features = .{},
-};
-
-pub const VulkanGPU = struct {
     const Self = @This();
 
     allocator: Allocator,
-    options: VulkanGPUOptions = .{},
+    options: Options = .{},
 
     vulkan_lib: std.DynLib = undefined,
 
@@ -79,7 +80,7 @@ pub const VulkanGPU = struct {
 
     pub fn init(
         allocator: Allocator,
-        options: VulkanGPUOptions,
+        options: Options,
     ) !Self {
         var dev = VulkanGPU{
             .allocator = allocator,
@@ -123,29 +124,38 @@ pub const VulkanGPU = struct {
         dev.allocator.free(dev.instance_extensions);
     }
 
-    pub fn log(dev: *const Self, level: std.log.Level, comptime format: []const u8, args: anytype) void {
+    pub fn log(
+        dev: *const Self,
+        level: std.log.Level,
+        comptime format: []const u8,
+        args: anytype
+    ) void {
         switch (level) {
-            .debug => if (dev.options.debug_mode) std.log.debug("(gpu) " ++ format, args),
-            .info => if (dev.options.debug_mode) std.log.info("(gpu) " ++ format, args),
+            .debug => if (dev.options.debug_mode) {
+                std.log.debug("(gpu) " ++ format, args);
+            },
+            .info => if (dev.options.debug_mode) {
+                std.log.info("(gpu) " ++ format, args);
+            },
             .warn => std.log.warn("(gpu) " ++ format, args),
             .err => std.log.err("(gpu) " ++ format, args),
         }
     }
 };
 
-pub const VulkanAppOptions = struct {
-    debug_mode: bool = false,
-};
-
 pub const VulkanApp = struct {
+    pub const Options = struct {
+        debug_mode: bool = false,
+    };
+
     const Self = @This();
 
     allocator: Allocator,
-    options: VulkanAppOptions = .{},
+    options: Options = .{},
 
     gpu: *const VulkanGPU = undefined,
 
-    shared_memories: []const SharedBuffer,
+    shared_memories: []const sm.SharedMemory,
     dispatch: Dispatch,
 
     device_memories: std.ArrayList(vk.DeviceMemory) = .{},
@@ -167,37 +177,37 @@ pub const VulkanApp = struct {
         allocator: Allocator,
         gpu: *const VulkanGPU,
         shader_path: []const u8,
-        data: []const SharedBuffer,
+        shared_memories: []const SharedMemory,
         dispatch: Dispatch,
-        options: VulkanAppOptions,
+        options: Options,
     ) !Self {
+        var app = VulkanApp{
+            .allocator = allocator,
+            .gpu = gpu,
+            .shared_memories = shared_memories,
+            .dispatch = dispatch,
+            .options = options,
+        };
+
         var binding_set = std.AutoHashMap(u32, void).init(
             allocator
         );
         defer binding_set.deinit();
 
-        for (data) |*shrd_mem| {
+        for (shared_memories) |*shrd_mem| {
             const res = try binding_set.fetchPut(shrd_mem.binding, {});
             if (res) |e| {
-                std.log.err("Found duplicate binding: {d}", .{e.key});
+                app.log(.err, "Found duplicate binding: {d}", .{e.key});
                 return error.DuplicateBinding;
             }
         }
 
         std.fs.cwd().access(shader_path, .{}) catch |e| switch (e) {
             error.FileNotFound => {
-                std.log.err("File: {s} not found\n", .{shader_path});
+                app.log(.err, "File: {s} not found\n", .{shader_path});
                 return error.FileNotFound;
             },
             else => return e,
-        };
-
-        var app = VulkanApp{
-            .allocator = allocator,
-            .gpu = gpu,
-            .shared_memories = data,
-            .dispatch = dispatch,
-            .options = options,
         };
 
         try memory.createBuffer(&app);
@@ -252,45 +262,101 @@ pub const VulkanApp = struct {
     /// which should implement code for editing the buffer.
     /// It's parameters are:
     /// -> u8[] - buffer
-    /// -> u32 - number of elements
     /// -> usize - element size
-    pub fn editData(app: *const Self, index: usize, func: *const fn([]u8, u32, usize) void) !void {
+    pub fn editData(
+        app: *const Self,
+        binding: usize,
+        func: *const fn(data: []u8, shrd_mem: *const sm.SharedMemory) void
+    ) !void {
+        var index_or_null: ?usize = null;
+        for (app.shared_memories, 0..) |*shrd_mem, i| {
+            if (shrd_mem.binding == binding) {
+                index_or_null = i;
+                break;
+            }
+        }
+        const index = index_or_null orelse {
+            app.log(.err, "Memory with binding {d} not found", .{binding});
+            return error.BindingNotFound;
+        };
+
         const dev_mem = app.device_memories.items[index];
         const shrd_mem = app.shared_memories[index];
         const buffer_slice = @as([*]u8, @ptrCast(
-            try app.gpu.vkd.mapMemory(app.gpu.device, dev_mem, 0, shrd_mem.size(), .{})
+            try app.gpu.vkd.mapMemory(
+                app.gpu.device,
+                dev_mem,
+                0,
+                shrd_mem.size(),
+                .{}
+            ) orelse {
+                app.log(
+                    .err,
+                    "Failed to map memory with binding {d}",
+                    .{binding}
+                );
+                return error.mapMemoryFailed;
+            }
         ))[0..shrd_mem.size()];
 
-        func(buffer_slice, shrd_mem.elem_num, shrd_mem.elem_size);
+        func(buffer_slice, &shrd_mem);
 
         app.gpu.vkd.unmapMemory(app.gpu.device, dev_mem);
     }
 
-    pub fn getData(app: *const Self, buf: anytype, index: usize, T: type) !void {
+    pub fn getData(
+        app: *const Self,
+        buf: anytype,
+        index: usize,
+        T: type
+    ) !void {
         const dev_mem = app.device_memories.items[index];
         const shrd_mem = app.shared_memories[index];
 
         const buffer_slice = @as([*]T, @ptrCast(@alignCast(
-            try app.gpu.vkd.mapMemory(app.gpu.device, dev_mem, 0, shrd_mem.size(), .{})
-        )))[0..shrd_mem.elem_num];
+            try app.gpu.vkd.mapMemory(
+                app.gpu.device,
+                dev_mem,
+                0,
+                shrd_mem.size(),
+                .{}
+            )
+        )))[0..shrd_mem.elem_num()];
 
         @memcpy(buf, buffer_slice);
 
         app.gpu.vkd.unmapMemory(app.gpu.device, dev_mem);
     }
 
-    pub fn getDataAlloc(app: *const Self, allocator: Allocator, index: usize, T: type) ![]T {
-        const buf = try allocator.alloc(T, app.shared_memories[index].elem_num);
+    pub fn getDataAlloc(
+        app: *const Self,
+        allocator: Allocator,
+        index: usize,
+        T: type
+    ) ![]T {
+        const buf = try allocator.alloc(
+            T,
+            app.shared_memories[index].elem_num()
+        );
 
         try app.getData(buf, index, T);
 
         return buf;
     }
 
-    pub fn log(app: *const Self, level: std.log.Level, comptime format: []const u8, args: anytype) void {
+    pub fn log(
+        app: *const Self,
+        level: std.log.Level,
+        comptime format: []const u8,
+        args: anytype
+    ) void {
         switch (level) {
-            .debug => if (app.options.debug_mode) std.log.debug("(app) " ++ format, args),
-            .info => if (app.options.debug_mode) std.log.info("(app) " ++ format, args),
+            .debug => if (app.options.debug_mode) {
+                std.log.debug("(app) " ++ format, args);
+            },
+            .info => if (app.options.debug_mode) {
+                std.log.info("(app) " ++ format, args);
+            },
             .warn => std.log.warn("(app) " ++ format, args),
             .err => std.log.err("(app) " ++ format, args),
         }

@@ -22,7 +22,7 @@
           packages = with pkgs; [
             nushell
             zig_0_15
-	    shader-slang
+            shader-slang
           ];
 
           shellHook = ''
