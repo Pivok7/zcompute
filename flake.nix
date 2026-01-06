@@ -20,16 +20,13 @@
       {
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
-            nushell
             zig_0_15
             shader-slang
           ];
 
           shellHook = ''
-            echo "nushell   `nu -v`"
             echo "zig       `zig version`"
             echo -n "slangc    "; slangc -v
-            exec nu --config ./config.nu
           '';
 
           LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
