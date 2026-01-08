@@ -7,13 +7,12 @@ const memory = @import("memory.zig");
 const shader = @import("shader.zig");
 const pipeline = @import("pipeline.zig");
 const command = @import("command.zig");
-const sm = @import("shared_memory.zig");
+const SharedMemory = @import("SharedMemory.zig");
 
 const Allocator = std.mem.Allocator;
 const BaseWrapper = vk.BaseDispatch;
 const InstanceWrapper = vk.InstanceDispatch;
 const DeviceWrapper = vk.DeviceDispatch;
-pub const SharedMemory = sm.SharedMemory;
 
 pub const validation_layers = [_][*:0]const u8{
     "VK_LAYER_KHRONOS_validation",
@@ -155,7 +154,7 @@ pub const VulkanApp = struct {
 
     gpu: *const VulkanGPU = undefined,
 
-    shared_memories: []const sm.SharedMemory,
+    shared_memories: []const SharedMemory,
     dispatch: Dispatch,
 
     device_memories: std.ArrayList(vk.DeviceMemory) = .{},
@@ -266,7 +265,7 @@ pub const VulkanApp = struct {
     pub fn editData(
         app: *const Self,
         binding: usize,
-        func: *const fn(data: []u8, shrd_mem: *const sm.SharedMemory) void
+        func: *const fn(data: []u8, shrd_mem: *const SharedMemory) void
     ) !void {
         var index_or_null: ?usize = null;
         for (app.shared_memories, 0..) |*shrd_mem, i| {
