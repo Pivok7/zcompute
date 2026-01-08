@@ -10,7 +10,11 @@ pub fn createCommandPool(app: *const App) !vk.CommandPool {
         .queue_family_index = app.gpu.compute_queue_index,
     };
 
-    return try app.gpu.vkd.createCommandPool(app.gpu.device, @ptrCast(&create_info), null);
+    return try app.gpu.vkd.createCommandPool(
+        app.gpu.device,
+        @ptrCast(&create_info),
+        null
+    );
 }
 
 pub fn createCommandBuffer(app: *const App) !vk.CommandBuffer {
@@ -23,7 +27,11 @@ pub fn createCommandBuffer(app: *const App) !vk.CommandBuffer {
     const command_buffers = try app.allocator.alloc(vk.CommandBuffer, 1);
     defer app.allocator.free(command_buffers);
 
-    try app.gpu.vkd.allocateCommandBuffers(app.gpu.device, @ptrCast(&allocate_info), @ptrCast(command_buffers.ptr));
+    try app.gpu.vkd.allocateCommandBuffers(
+        app.gpu.device,
+        @ptrCast(&allocate_info),
+        @ptrCast(command_buffers.ptr)
+    );
 
     const command_buffer = command_buffers[0];
 
@@ -31,18 +39,40 @@ pub fn createCommandBuffer(app: *const App) !vk.CommandBuffer {
 
     try app.gpu.vkd.beginCommandBuffer(command_buffer, &begin_info);
     app.gpu.vkd.cmdBindPipeline(command_buffer, .compute, app.compute_pipeline);
-    app.gpu.vkd.cmdBindDescriptorSets(command_buffer, .compute, app.pipeline_layout, 0, 1, @ptrCast(&app.descriptor_set), 0, null);
-    app.gpu.vkd.cmdDispatch(command_buffer, @intCast(app.dispatch.x), @intCast(app.dispatch.y), @intCast(app.dispatch.z));
+    app.gpu.vkd.cmdBindDescriptorSets(
+        command_buffer,
+        .compute,
+        app.pipeline_layout,
+        0,
+        1,
+        @ptrCast(&app.descriptor_set),
+        0,
+        null
+    );
+    app.gpu.vkd.cmdDispatch(
+        command_buffer,
+        @intCast(app.shader.?.dispatch.x),
+        @intCast(app.shader.?.dispatch.y),
+        @intCast(app.shader.?.dispatch.z)
+    );
     try app.gpu.vkd.endCommandBuffer(command_buffer);
 
     return command_buffer;
 }
 
 pub fn submitWork(app: *const App) !void {
-    const queue = app.gpu.vkd.getDeviceQueue(app.gpu.device, app.gpu.compute_queue_index, 0);
+    const queue = app.gpu.vkd.getDeviceQueue(
+        app.gpu.device,
+        app.gpu.compute_queue_index,
+        0
+    );
 
     const fence_create_info = vk.FenceCreateInfo{};
-    const fence = try app.gpu.vkd.createFence(app.gpu.device, @ptrCast(&fence_create_info), null);
+    const fence = try app.gpu.vkd.createFence(
+        app.gpu.device,
+        @ptrCast(&fence_create_info),
+        null
+    );
 
     const submit_info = vk.SubmitInfo{
         .command_buffer_count = 1,

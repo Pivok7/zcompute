@@ -5,7 +5,7 @@ const core = @import("core.zig");
 const App = core.VulkanApp;
 
 pub fn createBuffer(app: *App) !void {
-    for (app.shared_memories) |memory| {
+    for (app.shared_memories.items) |memory| {
         const buffer_create_info = vk.BufferCreateInfo{
             .size = memory.size(),
             .usage = .{ .storage_buffer_bit = true },
@@ -67,17 +67,33 @@ pub fn createBuffer(app: *App) !void {
     }
 
     for (alloc_infos.items) |alloc_info| {
-        const buffer_memory = try app.gpu.vkd.allocateMemory(app.gpu.device, &alloc_info, null);
+        const buffer_memory = try app.gpu.vkd.allocateMemory(
+            app.gpu.device,
+            &alloc_info,
+            null
+        );
         try app.device_memories.append(app.allocator, buffer_memory);
     }
 
-    for (app.device_memories.items, app.shared_memories, 0..) |dev_mem, shrd_mem, i| {
+    for (
+        app.device_memories.items,
+        app.shared_memories.items,
+        0..
+    ) |dev_mem, shrd_mem, i| {
         if (shrd_mem.data) |data| {
             const buffer_slice = @as([*]u8, @ptrCast(
-                try app.gpu.vkd.mapMemory(app.gpu.device, dev_mem, 0, shrd_mem.size(), .{})
+                try app.gpu.vkd.mapMemory(
+                    app.gpu.device,
+                    dev_mem,
+                    0,
+                    shrd_mem.size(),
+                    .{}
+                )
             ))[0..shrd_mem.size()];
 
-            const data_slice = @as([*]const u8, @ptrCast(data))[0..shrd_mem.size()];
+            const data_slice = @as(
+                [*]const u8, @ptrCast(data)
+            )[0..shrd_mem.size()];
 
             @memcpy(buffer_slice, data_slice);
 

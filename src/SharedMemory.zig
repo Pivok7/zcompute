@@ -3,7 +3,7 @@ const std = @import("std");
 const Self = @This();
 
 data: ?*const anyopaque = null,
-binding: u32,
+binding: u32 = 0,
 info: union(enum) {
     buffer: Buffer,
     image_2d: void,
@@ -41,13 +41,12 @@ pub const Buffer = struct {
     /// Create buffer with undefined data.
     /// It doesn't allocate any memory.
     /// The length is purerly informational.
-    pub fn newEmpty(T: type, len: u32, binding: u32) !Self {
+    pub fn newEmpty(T: type, len: u32) !Self {
         if (len == 0) return error.LengthTooShort;
         if (@sizeOf(T) == 0) return error.ZeroSizeType;
 
         return .{
             .data = null,
-            .binding = binding,
             .info = .{ .buffer = .{
                 .elem_num = len,
                 .elem_size = @sizeOf(T),
@@ -58,7 +57,7 @@ pub const Buffer = struct {
     /// Create buffer with provided slice.
     /// SharedBuffer doesn't own this data so the caller is
     /// responsible for managing the memory.
-    pub fn newSlice(slice: anytype, binding: u32) !Self {
+    pub fn newSlice(slice: anytype) !Self {
         if (slice.len == 0) return error.NotSlice;
 
         const child_type = @typeInfo(@TypeOf(slice)).pointer.child;
@@ -66,7 +65,6 @@ pub const Buffer = struct {
 
         return .{
             .data = @ptrCast(slice.ptr),
-            .binding = binding,
             .info = .{ .buffer = .{
                 .elem_num = @intCast(slice.len),
                 .elem_size = @sizeOf(child_type),

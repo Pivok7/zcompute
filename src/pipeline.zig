@@ -9,7 +9,7 @@ pub fn createDescriptorSetLayout(app: *const App) !vk.DescriptorSetLayout {
     var layout_bindings = std.ArrayList(vk.DescriptorSetLayoutBinding){};
     defer layout_bindings.deinit(app.allocator);
 
-    for (app.shared_memories) |*shrd_mem| {
+    for (app.shared_memories.items) |*shrd_mem| {
         try layout_bindings.append(app.allocator, .{
             .binding = shrd_mem.binding,
             .descriptor_type = .storage_buffer,
@@ -48,7 +48,7 @@ pub fn createPipelineCache(app: *const App) !vk.PipelineCache {
 pub fn CreatePipeline(app: *const App) !vk.Pipeline {
     const shader_create_info = vk.PipelineShaderStageCreateInfo{
         .stage = .{ .compute_bit = true },
-        .module = app.shader_module,
+        .module = app.shader.?.module,
         .p_name = "main",
     };
 
@@ -78,14 +78,14 @@ pub fn createDescriptorPool(app: *const App) !vk.DescriptorPool {
     const pool_sizes = [_]vk.DescriptorPoolSize{
         .{
             .type = .storage_buffer,
-            .descriptor_count = @intCast(app.shared_memories.len),
+            .descriptor_count = @intCast(app.shared_memories.items.len),
         }
     };
 
     const create_info = vk.DescriptorPoolCreateInfo{
         .pool_size_count = pool_sizes.len,
         .p_pool_sizes = &pool_sizes,
-        .max_sets = @intCast(app.shared_memories.len),
+        .max_sets = @intCast(app.shared_memories.items.len),
     };
 
     return app.gpu.vkd.createDescriptorPool(app.gpu.device, &create_info, null);
@@ -112,7 +112,10 @@ pub fn createDescriptorSet(app: *const App) !vk.DescriptorSet {
     var buffer_infos = std.ArrayList(vk.DescriptorBufferInfo){};
     defer buffer_infos.deinit(app.allocator);
 
-    for (app.device_buffers.items, app.shared_memories) |buffer, memory| {
+    for (
+        app.device_buffers.items,
+        app.shared_memories.items
+    ) |buffer, memory| {
         try buffer_infos.append(app.allocator, .{
             .buffer = buffer,
             .offset = 0,
@@ -123,7 +126,10 @@ pub fn createDescriptorSet(app: *const App) !vk.DescriptorSet {
     var write_descriptor_sets = std.ArrayList(vk.WriteDescriptorSet){};
     defer write_descriptor_sets.deinit(app.allocator);
 
-    for (buffer_infos.items, app.shared_memories) |*buffer_info, *shrd_mem| {
+    for (
+        buffer_infos.items,
+        app.shared_memories.items
+    ) |*buffer_info, *shrd_mem| {
         try write_descriptor_sets.append(app.allocator, .{
             .dst_set = descriptor_set,
             .dst_binding = shrd_mem.binding,
