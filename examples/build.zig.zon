@@ -1,8 +1,8 @@
 .{
-    .name = .example,
+    .name = .examples,
     .version = "1.0.0",
     .minimum_zig_version = "0.15.2",
-    .fingerprint = 0x6eec9b9f370ac0e2, // Changing this has security and trust implications.
+    .fingerprint = 0x7bd0ad45d3f163ea, // Changing this has security and trust implications.
 
     .dependencies = .{
         .zcompute = .{

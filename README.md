@@ -26,7 +26,7 @@ const zcompute_dep = b.dependency("zcompute", .{
 exe.root_module.addImport("zcompute", zcompute_dep.module("zcompute"));
 ```
 
-For examples check out the 'example' folder
+For examples check out the 'examples' folder
 
 ## Third party libraries used in this project
 
