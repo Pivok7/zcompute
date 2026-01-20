@@ -1,6 +1,5 @@
 const std = @import("std");
 const vk = @import("vulkan");
-const c = @import("c.zig");
 const core = @import("core.zig");
 
 const GPU = core.VulkanGPU;
@@ -55,7 +54,7 @@ fn checkValidationLayerSupport(gpu: *const GPU) !void {
         std.debug.print("Active validation layers ({d}): \n", .{validation_layers.len});
         for (validation_layers) |val_layer| {
             for (available_layers) |ava_layer| {
-                if (c.cStringEql(val_layer, &ava_layer.layer_name)) {
+                if (std.mem.orderZ(u8, val_layer, @ptrCast(&ava_layer.layer_name)) == .eq) {
                     std.debug.print("\t [X] {s}\n", .{ava_layer.layer_name});
                 } else {
                     std.debug.print("\t [ ] {s}\n", .{ava_layer.layer_name});
@@ -68,7 +67,7 @@ fn checkValidationLayerSupport(gpu: *const GPU) !void {
         var found_layer: bool = false;
 
         for (available_layers) |ava_layer| {
-            if (c.cStringEql(val_layer, &ava_layer.layer_name)) {
+            if (std.mem.orderZ(u8, val_layer, @ptrCast(&ava_layer.layer_name)) == .eq) {
                 found_layer = true;
                 break;
             }
