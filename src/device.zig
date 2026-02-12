@@ -133,20 +133,18 @@ pub fn createLogicalDevice(gpu: *const GPU) !vk.Device {
 
     var feature_chain: ?*anyopaque = null;
 
-    var features_AMD = vk.PhysicalDeviceCoherentMemoryFeaturesAMD{
+    var feature_AMD = vk.PhysicalDeviceCoherentMemoryFeaturesAMD{
         .device_coherent_memory = vk.TRUE,
     };
+
+    if (supportsCoherentMemoryAMD(gpu)) {
+        appendFeatureChain(&feature_chain, @ptrCast(&feature_AMD));
+        gpu.log(.debug, "Enabled device coherent memory for AMD", .{});
+    }
 
     var device_features = vk.PhysicalDeviceFeatures{
         .shader_float_64 = if (gpu.options.features.float64) vk.TRUE else vk.FALSE,
     };
-
-    const supports_coherent_memory_AMD = supportsCoherentMemoryAMD(gpu);
-
-    if (supports_coherent_memory_AMD) {
-        appendFeatureChain(&feature_chain, @ptrCast(&features_AMD));
-        gpu.log(.debug, "Enabled device coherent memory for AMD", .{});
-    }
 
     var create_info = vk.DeviceCreateInfo{
         .p_next = feature_chain,
@@ -174,11 +172,11 @@ pub fn getComputeQueueIndex(gpu: *const GPU) !u32 {
 
 fn appendFeatureChain(chain: *?*anyopaque, feature: *anyopaque) void {
     if (chain.*) |cha| {
-        var current_link: *anyopaque = cha;
-        while (@as(?*vk.PhysicalDeviceFeatures2, @alignCast(@ptrCast(current_link)))) |p_next| {
-            current_link = p_next;
+        var current_link: *vk.PhysicalDeviceFeatures2 = @alignCast(@ptrCast(cha));
+        while (current_link.p_next) |link| {
+            current_link = @alignCast(@ptrCast(link));
         }
-        @as(?*vk.PhysicalDeviceFeatures2, @alignCast(@ptrCast(current_link))).?.p_next = feature;
+        current_link.p_next = feature;
     } else {
         chain.* = feature;
     }

@@ -10,9 +10,6 @@ const SharedMemory = @import("SharedMemory.zig");
 const Shader = @import("Shader.zig");
 
 const Allocator = std.mem.Allocator;
-const BaseWrapper = vk.BaseDispatch;
-const InstanceWrapper = vk.InstanceDispatch;
-const DeviceWrapper = vk.DeviceDispatch;
 
 pub const validation_layers = [_][*:0]const u8{
     "VK_LAYER_KHRONOS_validation",
