@@ -6,7 +6,7 @@ const App = core.VulkanApp;
 const VkAssert = core.VkAssert;
 
 pub fn createDescriptorSetLayout(app: *const App) !vk.DescriptorSetLayout {
-    var layout_bindings = std.ArrayList(vk.DescriptorSetLayoutBinding){};
+    var layout_bindings: std.ArrayList(vk.DescriptorSetLayoutBinding) = .empty;
     defer layout_bindings.deinit(app.allocator);
 
     for (app.shared_memories.items) |*shrd_mem| {
@@ -45,7 +45,7 @@ pub fn createPipelineCache(app: *const App) !vk.PipelineCache {
     return app.gpu.vkd.createPipelineCache(app.gpu.device, &create_info, null);
 }
 
-pub fn CreatePipeline(app: *const App) !vk.Pipeline {
+pub fn createPipeline(app: *const App) !vk.Pipeline {
     const shader_create_info = vk.PipelineShaderStageCreateInfo{
         .stage = .{ .compute_bit = true },
         .module = app.shader.?.module,
@@ -109,8 +109,11 @@ pub fn createDescriptorSet(app: *const App) !vk.DescriptorSet {
 
     const descriptor_set = descriptor_sets[0];
 
-    var buffer_infos = std.ArrayList(vk.DescriptorBufferInfo){};
+    var buffer_infos: std.ArrayList(vk.DescriptorBufferInfo) = .empty;
     defer buffer_infos.deinit(app.allocator);
+
+    var image_infos: std.ArrayList(vk.DescriptorImageInfo) = .empty;
+    defer image_infos.deinit(app.allocator);
 
     for (
         app.device_buffers.items,
@@ -123,7 +126,18 @@ pub fn createDescriptorSet(app: *const App) !vk.DescriptorSet {
         });
     }
 
-    var write_descriptor_sets = std.ArrayList(vk.WriteDescriptorSet){};
+    for (
+        app.device_buffers.items,
+        app.shared_memories.items
+    ) |_, _| {
+        try image_infos.append(app.allocator, .{
+            .image_layout = .general,
+            .image_view = .null_handle,
+            .sampler = .null_handle,
+        });
+    }
+
+    var write_descriptor_sets: std.ArrayList(vk.WriteDescriptorSet) = .empty;
     defer write_descriptor_sets.deinit(app.allocator);
 
     for (

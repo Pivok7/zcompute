@@ -31,7 +31,11 @@ pub fn pickPhysicalDevice(gpu: *const GPU) !vk.PhysicalDevice {
     const available_devices = try gpu.allocator.alloc(vk.PhysicalDevice, device_count);
     defer gpu.allocator.free(available_devices);
 
-    result = try gpu.vki.enumeratePhysicalDevices(gpu.instance, &device_count, available_devices.ptr);
+    result = try gpu.vki.enumeratePhysicalDevices(
+        gpu.instance,
+        &device_count,
+        available_devices.ptr
+    );
     try VkAssert.withMessage(result, "Failed to find a GPU with Vulkan support.");
 
     for (available_devices) |device| {
@@ -52,23 +56,37 @@ fn isDeviceSuitable(gpu: *const GPU, device: vk.PhysicalDevice) !bool {
         return true;
     } else if (indices.isCapable()) {
         gpu.log(.debug, "Selected compute + graphics family", .{});
-        gpu.log(.warn, "Suboptimal queue family. Running compute + graphics family. Pure compute family is optimal", .{});
+        gpu.log(
+            .warn,
+            \\Suboptimal queue family
+            \\Running compute + graphics family
+            \\Pure compute family is optimal
+            ,
+            .{}
+        );
         return true;
     }
 
     return false;
 }
 
-fn findQueueFamilies(gpu: *const GPU, device: vk.PhysicalDevice) !QueueFamilyIndices {
+pub fn findQueueFamilies(gpu: *const GPU, device: vk.PhysicalDevice) !QueueFamilyIndices {
     var indices: QueueFamilyIndices = .{};
 
     var queue_family_count: u32 = 0;
     gpu.vki.getPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, null);
 
-    const available_queue_families = try gpu.allocator.alloc(vk.QueueFamilyProperties, queue_family_count);
+    const available_queue_families = try gpu.allocator.alloc(
+        vk.QueueFamilyProperties,
+        queue_family_count
+    );
     defer gpu.allocator.free(available_queue_families);
 
-    gpu.vki.getPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, available_queue_families.ptr);
+    gpu.vki.getPhysicalDeviceQueueFamilyProperties(
+        device,
+        &queue_family_count,
+        available_queue_families.ptr
+    );
 
     // First try to find optimal queue family
     for (available_queue_families, 0..) |queue_family, i| {
@@ -105,7 +123,7 @@ fn findQueueFamilies(gpu: *const GPU, device: vk.PhysicalDevice) !QueueFamilyInd
 pub fn createLogicalDevice(gpu: *const GPU) !vk.Device {
     const indices: QueueFamilyIndices = try findQueueFamilies(gpu, gpu.physical_device);
 
-    var unique_queue_families = std.ArrayList(u32){};
+    var unique_queue_families: std.ArrayList(u32) = .empty;
     defer unique_queue_families.deinit(gpu.allocator);
 
     const all_queue_families = &[_]u32{ indices.compute_bit.? };
@@ -158,11 +176,6 @@ pub fn createLogicalDevice(gpu: *const GPU) !vk.Device {
     };
 
     return try gpu.vki.createDevice(gpu.physical_device, &create_info, null);
-}
-
-pub fn getComputeQueue(gpu: *const GPU) !vk.Queue {
-    const indices: QueueFamilyIndices = try findQueueFamilies(gpu, gpu.physical_device);
-    return gpu.vkd.getDeviceQueue(gpu.device, indices.compute_bit.?, 0);
 }
 
 pub fn getComputeQueueIndex(gpu: *const GPU) !u32 {

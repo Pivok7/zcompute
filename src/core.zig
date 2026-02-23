@@ -60,12 +60,10 @@ pub const VulkanGPU = struct {
     vkd: vk.DeviceWrapper = undefined,
 
     instance: vk.Instance = .null_handle,
-    instance_extensions: [][*:0]const u8 = undefined,
 
     physical_device: vk.PhysicalDevice = .null_handle,
     device: vk.Device = .null_handle,
 
-    compute_queue: vk.Queue = .null_handle,
     compute_queue_index: u32 = undefined,
 
     pub fn init(
@@ -83,21 +81,29 @@ pub const VulkanGPU = struct {
 
         dev.vkb = vk.BaseWrapper.load(vkGetInstanceProcAddr);
 
-        dev.instance_extensions = try instance.getRequiredExtensions(&dev);
         dev.instance = try instance.createInstance(&dev);
         dev.log(.info, "Created Vulkan instance", .{});
 
-        dev.vki = vk.InstanceWrapper.load(dev.instance, dev.vkb.dispatch.vkGetInstanceProcAddr.?);
+        dev.vki = vk.InstanceWrapper.load(
+            dev.instance,
+            dev.vkb.dispatch.vkGetInstanceProcAddr.?
+        );
 
         dev.physical_device = try device.pickPhysicalDevice(&dev);
-        dev.log(.info, "Device: {s}", .{dev.vki.getPhysicalDeviceProperties(dev.physical_device).device_name});
+        dev.log(
+            .info,
+            "Device: {s}",
+            .{dev.vki.getPhysicalDeviceProperties(dev.physical_device).device_name}
+        );
 
         dev.device = try device.createLogicalDevice(&dev);
         dev.log(.debug, "Created logical device", .{});
 
-        dev.vkd = vk.DeviceWrapper.load(dev.device, dev.vki.dispatch.vkGetDeviceProcAddr.?);
+        dev.vkd = vk.DeviceWrapper.load(
+            dev.device,
+            dev.vki.dispatch.vkGetDeviceProcAddr.?
+        );
 
-        dev.compute_queue = try device.getComputeQueue(&dev);
         dev.compute_queue_index = try device.getComputeQueueIndex(&dev);
 
         return dev;
@@ -110,8 +116,6 @@ pub const VulkanGPU = struct {
 
         dev.vulkan_lib.close();
         dev.log(.debug, "Unloaded Vulkan library", .{});
-
-        dev.allocator.free(dev.instance_extensions);
     }
 
     pub fn log(
@@ -145,10 +149,15 @@ pub const VulkanApp = struct {
 
     gpu: *const VulkanGPU = undefined,
 
-    shared_memories: std.ArrayList(SharedMemory) = .{},
+    shared_memories: std.ArrayList(SharedMemory) = .empty,
 
-    device_memories: std.ArrayList(vk.DeviceMemory) = .{},
-    device_buffers: std.ArrayList(vk.Buffer) = .{},
+    device_memories: std.ArrayList(vk.DeviceMemory) = .empty,
+    device_buffers: std.ArrayList(vk.Buffer) = .empty,
+
+    images: std.ArrayList(vk.Image) = .empty,
+    image_views: std.ArrayList(vk.ImageView) = .empty,
+    image_memories: std.ArrayList(vk.DeviceMemory) = .empty,
+    image_buffers: std.ArrayList(vk.Buffer) = .empty,
 
     shader: ?Shader = null,
 
@@ -225,14 +234,14 @@ pub const VulkanApp = struct {
             }
         }
 
-        try memory.createBuffer(app);
+        try memory.createMemory(app);
         app.log(.debug, "Created memory buffer", .{});
 
         app.descriptor_set_layout = try pipeline.createDescriptorSetLayout(app);
         app.descriptor_pool = try pipeline.createDescriptorPool(app);
         app.pipeline_layout = try pipeline.createPipelineLayout(app);
         app.pipeline_cache = try pipeline.createPipelineCache(app);
-        app.compute_pipeline = try pipeline.CreatePipeline(app);
+        app.compute_pipeline = try pipeline.createPipeline(app);
         app.descriptor_set = try pipeline.createDescriptorSet(app);
         app.log(.debug, "Created compute pipeline", .{});
 
@@ -254,14 +263,34 @@ pub const VulkanApp = struct {
             shader.deinit(app);
         }
 
-        for (app.device_memories.items) |*mem| {
-            app.gpu.vkd.freeMemory(app.gpu.device, mem.*, null);
+        for (app.images.items) |img| {
+            app.gpu.vkd.destroyImage(app.gpu.device, img, null);
         }
 
-        for (app.device_buffers.items) |*buf| {
-            app.gpu.vkd.destroyBuffer(app.gpu.device, buf.*, null);
+        for (app.image_views.items) |img_view| {
+            app.gpu.vkd.destroyImageView(app.gpu.device, img_view, null);
         }
 
+        for (app.image_memories.items) |img_mem| {
+            app.gpu.vkd.freeMemory(app.gpu.device, img_mem, null);
+        }
+
+        for (app.image_buffers.items) |img_buf| {
+            app.gpu.vkd.destroyBuffer(app.gpu.device, img_buf, null);
+        }
+
+        for (app.device_memories.items) |mem| {
+            app.gpu.vkd.freeMemory(app.gpu.device, mem, null);
+        }
+
+        for (app.device_buffers.items) |buf| {
+            app.gpu.vkd.destroyBuffer(app.gpu.device, buf, null);
+        }
+
+        app.images.deinit(app.allocator);
+        app.image_views.deinit(app.allocator);
+        app.image_memories.deinit(app.allocator);
+        app.image_buffers.deinit(app.allocator);
         app.device_memories.deinit(app.allocator);
         app.device_buffers.deinit(app.allocator);
         app.shared_memories.deinit(app.allocator);

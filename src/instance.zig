@@ -6,14 +6,17 @@ const GPU = core.VulkanGPU;
 const vkAssesrt = core.VkAssert;
 const validation_layers = core.validation_layers;
 
-pub fn getRequiredExtensions(gpu: *const GPU) ![][*:0]const u8 {
-    var extensions = std.ArrayList([*:0]const u8){};
+fn getRequiredExtensions(gpu: *const GPU) ![][*:0]const u8 {
+    var extensions: std.ArrayList([*:0]const u8) = .empty;
     try extensions.append(gpu.allocator, vk.extensions.ext_debug_utils.name);
 
     return try extensions.toOwnedSlice(gpu.allocator);
 }
 
 pub fn createInstance(gpu: *const GPU) !vk.Instance {
+    const required_extensions = try getRequiredExtensions(gpu);
+    defer gpu.allocator.free(required_extensions);
+
     if (gpu.options.enable_validation_layers) {
         try checkValidationLayerSupport(gpu);
     }
@@ -29,10 +32,12 @@ pub fn createInstance(gpu: *const GPU) !vk.Instance {
     const create_info = vk.InstanceCreateInfo{
         .flags = .{},
         .p_application_info = &app_info,
-        .enabled_layer_count = if (gpu.options.enable_validation_layers) @intCast(validation_layers.len) else 0,
-        .pp_enabled_layer_names = if (gpu.options.enable_validation_layers) @ptrCast(&validation_layers) else null,
-        .enabled_extension_count = @intCast(gpu.instance_extensions.len),
-        .pp_enabled_extension_names = gpu.instance_extensions.ptr,
+        .enabled_layer_count = if (gpu.options.enable_validation_layers)
+            @intCast(validation_layers.len) else 0,
+        .pp_enabled_layer_names = if (gpu.options.enable_validation_layers)
+            @ptrCast(&validation_layers) else null,
+        .enabled_extension_count = @intCast(required_extensions.len),
+        .pp_enabled_extension_names = required_extensions.ptr,
     };
 
     return try gpu.vkb.createInstance(&create_info, null);
