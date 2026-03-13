@@ -16,41 +16,62 @@ fn createBuffer(app: *App, size: usize) !vk.Buffer {
     return try app.gpu.vkd.createBuffer(app.gpu.device, &buffer_create_info, null);
 }
 
-fn findMemoryType(app: *App, flags: vk.MemoryPropertyFlags) ?u32 {
-    const mem_properties = app.gpu.vki.getPhysicalDeviceMemoryProperties(app.gpu.physical_device);
-    var mem_type_index: ?u32 = null;
+fn findMemoryType(
+    app: *App,
+    mem_type_bits: u32,
+    properties: vk.MemoryPropertyFlags
+) ?u32 {
+    const mem_props = app.gpu.vki.getPhysicalDeviceMemoryProperties(app.gpu.physical_device);
 
-    for (0..mem_properties.memory_type_count) |i| {
-        const mem_type = mem_properties.memory_types[i];
-
-        if (mem_type.property_flags.contains(flags)) {
-            mem_type_index = @intCast(i);
-            break;
+    for (0..mem_props.memory_type_count) |i| {
+        if (
+            (mem_type_bits & (@as(u32, 1) << @intCast(i)) != 0) and
+            (mem_props.memory_types[i].property_flags.contains(properties))
+        ) {
+            return @intCast(i);
         }
     }
 
-    return mem_type_index;
+    return null;
 }
 
-pub fn createMemory(app: *App) !void {
+pub fn mapMemory(
+    app: *const App,
+    device_memory: vk.DeviceMemory,
+    offset: vk.DeviceSize,
+    size: vk.DeviceSize
+) ![]u8 {
+    const buffer_opaque = try app.gpu.vkd.mapMemory(
+        app.gpu.device,
+        device_memory,
+        offset,
+        size,
+        .{},
+    ) orelse {
+        return error.MemoryMapFail;
+    };
+
+    return @as([*]u8, @ptrCast(buffer_opaque))[0..size];
+}
+
+pub fn createBuffers(app: *App) !void {
     for (app.shared_memories.items) |memory| {
         const buffer = try createBuffer(app, memory.size());
-        try app.device_buffers.append(app.allocator, buffer);
+        try app.buffers.append(app.allocator, buffer);
     }
 
-    var mem_requirements: std.ArrayList(vk.MemoryRequirements) = .empty;
-    defer mem_requirements.deinit(app.allocator);
-
-    for (app.device_buffers.items) |buffer| {
-        try mem_requirements.append(app.allocator, app.gpu.vkd.getBufferMemoryRequirements(app.gpu.device, buffer));
-    }
+    const mem_requirements = app.gpu.vkd.getBufferMemoryRequirements(
+        app.gpu.device,
+        // We can grab the first one as all of them
+        // have the same create info
+        app.buffers.items[0]
+    );
+    const mem_alignment = mem_requirements.alignment;
 
     const mem_type_index = findMemoryType(
         app,
-        .{
-            .host_visible_bit = true,
-            .host_coherent_bit = true,
-        },
+        mem_requirements.memory_type_bits,
+        .{ .host_visible_bit = true, .host_coherent_bit = true },
     ) orelse {
         std.log.err("No suitable memory type index", .{});
         return error.NoSuitableMemoryTypeIndex;
@@ -59,32 +80,45 @@ pub fn createMemory(app: *App) !void {
     var alloc_infos: std.ArrayList(vk.MemoryAllocateInfo) = .empty;
     defer alloc_infos.deinit(app.allocator);
 
-    for (mem_requirements.items) |mem_req| {
-        try alloc_infos.append(app.allocator, .{
-            .allocation_size = mem_req.size,
-            .memory_type_index = mem_type_index,
-        });
+    var total_buffers_size: usize = 0;
+    for (app.shared_memories.items) |*shrd_mem| {
+        try app.buffers_offsets.append(app.allocator, total_buffers_size);
+        total_buffers_size += std.mem.alignForward(usize, shrd_mem.size(), mem_alignment);
     }
 
-    for (alloc_infos.items) |alloc_info| {
-        const buffer_memory = try app.gpu.vkd.allocateMemory(app.gpu.device, &alloc_info, null);
-        try app.device_memories.append(app.allocator, buffer_memory);
-    }
+    const alloc_info = vk.MemoryAllocateInfo{
+        .allocation_size = total_buffers_size,
+        .memory_type_index = mem_type_index,
+    };
 
-    for (app.device_memories.items, app.shared_memories.items, 0..) |dev_mem, shrd_mem, i| {
+    app.buffers_memory = try app.gpu.vkd.allocateMemory(
+        app.gpu.device,
+        &alloc_info,
+        null
+    );
+
+    for (app.shared_memories.items, app.buffers.items, app.buffers_offsets.items)
+        |*shrd_mem, buf, offset| {
         if (shrd_mem.data) |data| {
-            const buffer_slice = @as([*]u8, @ptrCast(try app.gpu.vkd.mapMemory(app.gpu.device, dev_mem, 0, shrd_mem.size(), .{})))[0..shrd_mem.size()];
-
             const data_slice = @as([*]const u8, @ptrCast(data))[0..shrd_mem.size()];
 
-            @memcpy(buffer_slice, data_slice);
-
-            app.gpu.vkd.unmapMemory(app.gpu.device, dev_mem);
+            const mapped_memory = try mapMemory(
+                app,
+                app.buffers_memory,
+                offset,
+                shrd_mem.size()
+            );
+            @memcpy(mapped_memory, data_slice);
+            app.gpu.vkd.unmapMemory(app.gpu.device, app.buffers_memory);
         }
-        app.log(.debug, "Uploaded data ({d}) to GPU", .{i});
-    }
 
-    for (app.device_buffers.items, app.device_memories.items) |dev_buf, dev_mem| {
-        try app.gpu.vkd.bindBufferMemory(app.gpu.device, dev_buf, dev_mem, 0);
+        try app.gpu.vkd.bindBufferMemory(
+            app.gpu.device,
+            buf,
+            app.buffers_memory,
+            offset
+        );
+
+        app.log(.debug, "Uploaded data (size: {d}) to GPU", .{shrd_mem.size()});
     }
 }

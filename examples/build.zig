@@ -22,15 +22,14 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(exe);
 
     // Shader compilation
-    const compile_comp_shader = b.addSystemCommand(&.{
+    const compile_shader = b.addSystemCommand(&.{
         "slangc",
         "src/shader.slang",
         "-target", "spirv",
         "-o", "src/shader.spv",
     });
 
-    exe.step.dependOn(&compile_comp_shader.step);
-    if (optimize == .Debug) try buildLog("compiled \"shader.slang\"\n", .{});
+    exe.step.dependOn(&compile_shader.step);
 
     // Run step
     const run_cmd = b.addRunArtifact(exe);

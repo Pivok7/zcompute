@@ -116,7 +116,7 @@ pub fn createDescriptorSet(app: *const App) !vk.DescriptorSet {
     defer image_infos.deinit(app.allocator);
 
     for (
-        app.device_buffers.items,
+        app.buffers.items,
         app.shared_memories.items
     ) |buffer, memory| {
         try buffer_infos.append(app.allocator, .{
@@ -127,7 +127,7 @@ pub fn createDescriptorSet(app: *const App) !vk.DescriptorSet {
     }
 
     for (
-        app.device_buffers.items,
+        app.buffers.items,
         app.shared_memories.items
     ) |_, _| {
         try image_infos.append(app.allocator, .{

@@ -151,13 +151,14 @@ pub const VulkanApp = struct {
 
     shared_memories: std.ArrayList(SharedMemory) = .empty,
 
-    device_memories: std.ArrayList(vk.DeviceMemory) = .empty,
-    device_buffers: std.ArrayList(vk.Buffer) = .empty,
+    buffers: std.ArrayList(vk.Buffer) = .empty,
+    buffers_offsets: std.ArrayList(usize) = .empty,
+    buffers_memory: vk.DeviceMemory = .null_handle,
 
     images: std.ArrayList(vk.Image) = .empty,
     image_views: std.ArrayList(vk.ImageView) = .empty,
-    image_memories: std.ArrayList(vk.DeviceMemory) = .empty,
-    image_buffers: std.ArrayList(vk.Buffer) = .empty,
+    images_memory: vk.DeviceMemory = .null_handle,
+    image_samplers: std.ArrayList(vk.Sampler) = .empty,
 
     shader: ?Shader = null,
 
@@ -234,7 +235,7 @@ pub const VulkanApp = struct {
             }
         }
 
-        try memory.createMemory(app);
+        try memory.createBuffers(app);
         app.log(.debug, "Created memory buffer", .{});
 
         app.descriptor_set_layout = try pipeline.createDescriptorSetLayout(app);
@@ -271,28 +272,18 @@ pub const VulkanApp = struct {
             app.gpu.vkd.destroyImageView(app.gpu.device, img_view, null);
         }
 
-        for (app.image_memories.items) |img_mem| {
-            app.gpu.vkd.freeMemory(app.gpu.device, img_mem, null);
-        }
+        app.gpu.vkd.freeMemory(app.gpu.device, app.images_memory, null);
 
-        for (app.image_buffers.items) |img_buf| {
-            app.gpu.vkd.destroyBuffer(app.gpu.device, img_buf, null);
-        }
+        app.gpu.vkd.freeMemory(app.gpu.device, app.buffers_memory, null);
 
-        for (app.device_memories.items) |mem| {
-            app.gpu.vkd.freeMemory(app.gpu.device, mem, null);
-        }
-
-        for (app.device_buffers.items) |buf| {
+        for (app.buffers.items) |buf| {
             app.gpu.vkd.destroyBuffer(app.gpu.device, buf, null);
         }
 
         app.images.deinit(app.allocator);
         app.image_views.deinit(app.allocator);
-        app.image_memories.deinit(app.allocator);
-        app.image_buffers.deinit(app.allocator);
-        app.device_memories.deinit(app.allocator);
-        app.device_buffers.deinit(app.allocator);
+        app.buffers_offsets.deinit(app.allocator);
+        app.buffers.deinit(app.allocator);
         app.shared_memories.deinit(app.allocator);
     }
 
@@ -312,12 +303,11 @@ pub const VulkanApp = struct {
     ) !void {
         const index = try app.getBindingIndex(binding);
 
-        const dev_mem = app.device_memories.items[index];
         const shrd_mem = app.shared_memories.items[index];
         const buffer_slice = @as([*]u8, @ptrCast(
             try app.gpu.vkd.mapMemory(
                 app.gpu.device,
-                dev_mem,
+                app.buffers_memory,
                 0,
                 shrd_mem.size(),
                 .{}
@@ -333,33 +323,28 @@ pub const VulkanApp = struct {
 
         func(buffer_slice, &shrd_mem);
 
-        app.gpu.vkd.unmapMemory(app.gpu.device, dev_mem);
+        app.gpu.vkd.unmapMemory(app.gpu.device, app.buffers_memory);
     }
 
     pub fn getData(
         app: *const Self,
         buf: anytype,
         binding: u32,
-        T: type
     ) !void {
         const index = try app.getBindingIndex(binding);
 
-        const dev_mem = app.device_memories.items[index];
         const shrd_mem = app.shared_memories.items[index];
 
-        const buffer_slice = @as([*]T, @ptrCast(@alignCast(
-            try app.gpu.vkd.mapMemory(
-                app.gpu.device,
-                dev_mem,
-                0,
-                shrd_mem.size(),
-                .{}
-            )
-        )))[0..shrd_mem.elem_num()];
+        const mapped_memory = try memory.mapMemory(
+            app,
+            app.buffers_memory,
+            app.buffers_offsets.items[index],
+            shrd_mem.size(),
+        );
 
-        @memcpy(buf, buffer_slice);
+        @memcpy(buf, @as(@TypeOf(buf), @ptrCast(@alignCast(mapped_memory))));
 
-        app.gpu.vkd.unmapMemory(app.gpu.device, dev_mem);
+        app.gpu.vkd.unmapMemory(app.gpu.device, app.buffers_memory);
     }
 
     pub fn getDataAlloc(
@@ -375,7 +360,7 @@ pub const VulkanApp = struct {
             app.shared_memories.items[index].elem_num()
         );
 
-        try app.getData(buf, index, T);
+        try app.getData(buf, index);
 
         return buf;
     }
