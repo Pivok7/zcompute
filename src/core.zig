@@ -150,6 +150,8 @@ pub const VulkanApp = struct {
     gpu: *const VulkanGPU = undefined,
 
     shared_memories: std.ArrayList(SharedMemory) = .empty,
+    shrd_mem_buffers: std.ArrayList(*const SharedMemory) = .empty,
+    shrd_mem_images: std.ArrayList(*const SharedMemory) = .empty,
 
     buffers: std.ArrayList(vk.Buffer) = .empty,
     buffers_offsets: std.ArrayList(usize) = .empty,
@@ -217,6 +219,11 @@ pub const VulkanApp = struct {
     pub fn submit(
         app: *Self,
     ) !void {
+        if (app.shared_memories.items.len == 0) {
+            app.log(.err, "Cannot run with no SharedMemory bound", .{});
+            return error.NoSharedMemoryBound;
+        }
+
         if (app.shader == null) {
             app.log(.err, "Cannot create pipeline without shader", .{});
             return error.NoShaderLoaded;
@@ -235,8 +242,15 @@ pub const VulkanApp = struct {
             }
         }
 
+        for (app.shared_memories.items) |*shrd_mem| {
+            switch (shrd_mem.info) {
+                .buffer => try app.shrd_mem_buffers.append(app.allocator, shrd_mem),
+                .image_2d => try app.shrd_mem_images.append(app.allocator, shrd_mem),
+            }
+        }
+
         try memory.createBuffers(app);
-        app.log(.debug, "Created memory buffer", .{});
+        try memory.createImages(app);
 
         app.descriptor_set_layout = try pipeline.createDescriptorSetLayout(app);
         app.descriptor_pool = try pipeline.createDescriptorPool(app);
@@ -244,11 +258,17 @@ pub const VulkanApp = struct {
         app.pipeline_cache = try pipeline.createPipelineCache(app);
         app.compute_pipeline = try pipeline.createPipeline(app);
         app.descriptor_set = try pipeline.createDescriptorSet(app);
-        app.log(.debug, "Created compute pipeline", .{});
+        app.log(.info, "Created compute pipeline", .{});
 
         app.command_pool = try command.createCommandPool(app);
         app.command_buffer = try command.createCommandBuffer(app);
         app.log(.debug, "Created command pool", .{});
+    }
+
+    pub fn run(app: *const Self) !void {
+        app.log(.info, "Submitting work...", .{});
+        try command.submitWork(app);
+        app.log(.info, "Work finished", .{});
     }
 
     pub fn deinit(app: *Self) void {
@@ -284,11 +304,9 @@ pub const VulkanApp = struct {
         app.image_views.deinit(app.allocator);
         app.buffers_offsets.deinit(app.allocator);
         app.buffers.deinit(app.allocator);
+        app.shrd_mem_buffers.deinit(app.allocator);
+        app.shrd_mem_images.deinit(app.allocator);
         app.shared_memories.deinit(app.allocator);
-    }
-
-    pub fn run(app: *const Self) !void {
-        try command.submitWork(app);
     }
 
     /// This function takes another function as a parameter
@@ -304,24 +322,15 @@ pub const VulkanApp = struct {
         const index = try app.getBindingIndex(binding);
 
         const shrd_mem = app.shared_memories.items[index];
-        const buffer_slice = @as([*]u8, @ptrCast(
-            try app.gpu.vkd.mapMemory(
-                app.gpu.device,
-                app.buffers_memory,
-                0,
-                shrd_mem.size(),
-                .{}
-            ) orelse {
-                app.log(
-                    .err,
-                    "Failed to map memory with binding {d}",
-                    .{binding}
-                );
-                return error.mapMemoryFailed;
-            }
-        ))[0..shrd_mem.size()];
 
-        func(buffer_slice, &shrd_mem);
+        const mapped_memory = try memory.mapMemory(
+            app,
+            app.buffers_memory,
+            app.buffers_offsets.items[index],
+            shrd_mem.size(),
+        );
+
+        func(mapped_memory, &shrd_mem);
 
         app.gpu.vkd.unmapMemory(app.gpu.device, app.buffers_memory);
     }
@@ -360,11 +369,12 @@ pub const VulkanApp = struct {
             app.shared_memories.items[index].elem_num()
         );
 
-        try app.getData(buf, index);
+        try app.getData(buf, binding);
 
         return buf;
     }
 
+    // TODO: probably good idea to use hash map here
     fn getBindingIndex(app: *const Self, binding: u32) !u32 {
         return app.getBindingIndexOrNull(binding) orelse {
             app.log(.err, "Memory with binding {d} not found", .{binding});

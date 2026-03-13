@@ -55,8 +55,13 @@ pub fn mapMemory(
 }
 
 pub fn createBuffers(app: *App) !void {
-    for (app.shared_memories.items) |memory| {
-        const buffer = try createBuffer(app, memory.size());
+    if (app.shrd_mem_buffers.items.len == 0) {
+        app.log(.debug, "No buffers found, skipping...", .{});
+        return;
+    }
+
+    for (app.shrd_mem_buffers.items) |shrm_mem| {
+        const buffer = try createBuffer(app, shrm_mem.size());
         try app.buffers.append(app.allocator, buffer);
     }
 
@@ -81,7 +86,7 @@ pub fn createBuffers(app: *App) !void {
     defer alloc_infos.deinit(app.allocator);
 
     var total_buffers_size: usize = 0;
-    for (app.shared_memories.items) |*shrd_mem| {
+    for (app.shrd_mem_buffers.items) |shrd_mem| {
         try app.buffers_offsets.append(app.allocator, total_buffers_size);
         total_buffers_size += std.mem.alignForward(usize, shrd_mem.size(), mem_alignment);
     }
@@ -97,8 +102,8 @@ pub fn createBuffers(app: *App) !void {
         null
     );
 
-    for (app.shared_memories.items, app.buffers.items, app.buffers_offsets.items)
-        |*shrd_mem, buf, offset| {
+    for (app.shrd_mem_buffers.items, app.buffers.items, app.buffers_offsets.items)
+        |shrd_mem, buf, offset| {
         if (shrd_mem.data) |data| {
             const data_slice = @as([*]const u8, @ptrCast(data))[0..shrd_mem.size()];
 
@@ -119,6 +124,17 @@ pub fn createBuffers(app: *App) !void {
             offset
         );
 
-        app.log(.debug, "Uploaded data (size: {d}) to GPU", .{shrd_mem.size()});
+        app.log(
+            .debug,
+            "Uploaded buffer [{}] (size: {d}) to GPU",
+            .{ shrd_mem.binding, shrd_mem.size() }
+        );
+    }
+}
+
+pub fn createImages(app: *App) !void {
+    if (app.shrd_mem_images.items.len == 0) {
+        app.log(.debug, "No images found, skipping...", .{});
+        return;
     }
 }

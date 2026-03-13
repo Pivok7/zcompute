@@ -24,7 +24,7 @@ pub fn main() !void {
     );
     defer gpu.deinit();
 
-    // Create memory that will be shared between CPU and GPU
+    // Create memory that will get sent from CPU to GPU
     const sm0 = try SharedMemory.Buffer.newSlice(
         u32, &.{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 }
     );
@@ -34,10 +34,8 @@ pub fn main() !void {
     const sm2 = try SharedMemory.Buffer.newSlice(
         f64, &.{ 2.0, 4.0, 5.0, 7.7, 8.0, 10.0, 16.0, 32.0, 64.0, 100.0 },
     );
-    //const sm3 = try SharedMemory.Buffer.newEmpty(i32, 10);
-    // This is fake image2d for now
-    // it's just a buffer
-    const sm3 = try SharedMemory.Image2d.newEmpty(10, 1, .rgba8);
+    // TODO: This is fake image2d for now
+    //const sm3 = try SharedMemory.Image2d.newEmpty(10, 1, .rgba8);
 
     // Create an application
     var app = try zcomp.App.init(
@@ -51,7 +49,6 @@ pub fn main() !void {
     try app.bindMemory(&sm0, 0);
     try app.bindMemory(&sm1, 1);
     try app.bindMemory(&sm2, 2);
-    try app.bindMemory(&sm3, 3);
 
     // Load shader
     try app.loadShader(
@@ -71,8 +68,6 @@ pub fn main() !void {
     try app.run();
 
     // Collect the output
-    std.debug.print("Output:\n", .{});
-
     const one = try app.getDataAlloc(allocator, 0, u32);
     defer allocator.free(one);
 
@@ -82,11 +77,8 @@ pub fn main() !void {
     const three = try app.getDataAlloc(allocator, 2, f64);
     defer allocator.free(three);
 
-    const four = try app.getDataAlloc(allocator, 3, i32);
-    defer allocator.free(four);
-
+    std.debug.print("Output:\n", .{});
     std.debug.print("{any}\n", .{one});
     std.debug.print("{any}\n", .{two});
     std.debug.print("{any}\n", .{three});
-    std.debug.print("{any}\n", .{four});
 }

@@ -9,10 +9,15 @@ pub fn createDescriptorSetLayout(app: *const App) !vk.DescriptorSetLayout {
     var layout_bindings: std.ArrayList(vk.DescriptorSetLayoutBinding) = .empty;
     defer layout_bindings.deinit(app.allocator);
 
-    for (app.shared_memories.items) |*shrd_mem| {
+    for (app.shrd_mem_buffers.items) |shrd_mem| {
+        const descriptor_type: vk.DescriptorType = switch (shrd_mem.info) {
+            .buffer => .storage_buffer,
+            .image_2d => .combined_image_sampler,
+        };
+
         try layout_bindings.append(app.allocator, .{
             .binding = shrd_mem.binding,
-            .descriptor_type = .storage_buffer,
+            .descriptor_type = descriptor_type,
             .descriptor_count = 1,
             .stage_flags = .{ .compute_bit = true },
         });
@@ -78,14 +83,14 @@ pub fn createDescriptorPool(app: *const App) !vk.DescriptorPool {
     const pool_sizes = [_]vk.DescriptorPoolSize{
         .{
             .type = .storage_buffer,
-            .descriptor_count = @intCast(app.shared_memories.items.len),
+            .descriptor_count = @intCast(app.shrd_mem_buffers.items.len),
         }
     };
 
     const create_info = vk.DescriptorPoolCreateInfo{
         .pool_size_count = pool_sizes.len,
         .p_pool_sizes = &pool_sizes,
-        .max_sets = @intCast(app.shared_memories.items.len),
+        .max_sets = @intCast(app.shrd_mem_buffers.items.len),
     };
 
     return app.gpu.vkd.createDescriptorPool(app.gpu.device, &create_info, null);
@@ -98,42 +103,25 @@ pub fn createDescriptorSet(app: *const App) !vk.DescriptorSet {
         .p_set_layouts = @ptrCast(&app.descriptor_set_layout),
     };
 
-    const descriptor_sets = try app.allocator.alloc(vk.DescriptorSet, 1);
-    defer app.allocator.free(descriptor_sets);
+    var descriptor_set: vk.DescriptorSet = .null_handle;
 
     try app.gpu.vkd.allocateDescriptorSets(
         app.gpu.device,
         &allocate_info,
-        @ptrCast(descriptor_sets.ptr)
+        @ptrCast(&descriptor_set)
     );
-
-    const descriptor_set = descriptor_sets[0];
 
     var buffer_infos: std.ArrayList(vk.DescriptorBufferInfo) = .empty;
     defer buffer_infos.deinit(app.allocator);
 
-    var image_infos: std.ArrayList(vk.DescriptorImageInfo) = .empty;
-    defer image_infos.deinit(app.allocator);
-
     for (
         app.buffers.items,
-        app.shared_memories.items
-    ) |buffer, memory| {
+        app.shrd_mem_buffers.items
+    ) |buffer, shrd_mem| {
         try buffer_infos.append(app.allocator, .{
             .buffer = buffer,
             .offset = 0,
-            .range = memory.size(),
-        });
-    }
-
-    for (
-        app.buffers.items,
-        app.shared_memories.items
-    ) |_, _| {
-        try image_infos.append(app.allocator, .{
-            .image_layout = .general,
-            .image_view = .null_handle,
-            .sampler = .null_handle,
+            .range = shrd_mem.size(),
         });
     }
 
@@ -142,8 +130,8 @@ pub fn createDescriptorSet(app: *const App) !vk.DescriptorSet {
 
     for (
         buffer_infos.items,
-        app.shared_memories.items
-    ) |*buffer_info, *shrd_mem| {
+        app.shrd_mem_buffers.items
+    ) |*buffer_info, shrd_mem| {
         try write_descriptor_sets.append(app.allocator, .{
             .dst_set = descriptor_set,
             .dst_binding = shrd_mem.binding,
