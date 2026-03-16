@@ -183,6 +183,10 @@ pub fn getComputeQueueIndex(gpu: *const GPU) !u32 {
     return indices.compute_bit.?;
 }
 
+pub fn getComputeQueue(gpu: *const GPU) !vk.Queue {
+    return gpu.vkd.getDeviceQueue(gpu.device, gpu.compute_queue_index, 0);
+}
+
 fn appendFeatureChain(chain: *?*anyopaque, feature: *anyopaque) void {
     if (chain.*) |cha| {
         var current_link: *vk.PhysicalDeviceFeatures2 = @alignCast(@ptrCast(cha));

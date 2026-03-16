@@ -43,9 +43,16 @@ pub const VulkanGPU = struct {
             float64: bool = false,
         };
 
+        const VulkanApiVersion = struct {
+            major: u7 = 1,
+            minor: u10 = 1,
+            patch: u12 = 0,
+        };
+
         debug_mode: bool = false,
         enable_validation_layers: bool = false,
         features: Features = .{},
+        vulkan_api_version: VulkanApiVersion = .{},
     };
 
     const Self = @This();
@@ -64,6 +71,7 @@ pub const VulkanGPU = struct {
     physical_device: vk.PhysicalDevice = .null_handle,
     device: vk.Device = .null_handle,
 
+    compute_queue: vk.Queue = .null_handle,
     compute_queue_index: u32 = undefined,
 
     pub fn init(
@@ -105,6 +113,7 @@ pub const VulkanGPU = struct {
         );
 
         dev.compute_queue_index = try device.getComputeQueueIndex(&dev);
+        dev.compute_queue = try device.getComputeQueue(&dev);
 
         return dev;
     }
@@ -158,9 +167,9 @@ pub const VulkanApp = struct {
     buffers_memory: vk.DeviceMemory = .null_handle,
 
     images: std.ArrayList(vk.Image) = .empty,
-    image_views: std.ArrayList(vk.ImageView) = .empty,
+    images_views: std.ArrayList(vk.ImageView) = .empty,
     images_memory: vk.DeviceMemory = .null_handle,
-    image_samplers: std.ArrayList(vk.Sampler) = .empty,
+    images_samplers: std.ArrayList(vk.Sampler) = .empty,
 
     shader: ?Shader = null,
 
@@ -249,6 +258,8 @@ pub const VulkanApp = struct {
             }
         }
 
+        app.command_pool = try command.createCommandPool(app);
+
         try memory.createBuffers(app);
         try memory.createImages(app);
 
@@ -260,7 +271,6 @@ pub const VulkanApp = struct {
         app.descriptor_set = try pipeline.createDescriptorSet(app);
         app.log(.info, "Created compute pipeline", .{});
 
-        app.command_pool = try command.createCommandPool(app);
         app.command_buffer = try command.createCommandBuffer(app);
         app.log(.debug, "Created command pool", .{});
     }
@@ -288,7 +298,7 @@ pub const VulkanApp = struct {
             app.gpu.vkd.destroyImage(app.gpu.device, img, null);
         }
 
-        for (app.image_views.items) |img_view| {
+        for (app.images_views.items) |img_view| {
             app.gpu.vkd.destroyImageView(app.gpu.device, img_view, null);
         }
 
@@ -301,7 +311,7 @@ pub const VulkanApp = struct {
         }
 
         app.images.deinit(app.allocator);
-        app.image_views.deinit(app.allocator);
+        app.images_views.deinit(app.allocator);
         app.buffers_offsets.deinit(app.allocator);
         app.buffers.deinit(app.allocator);
         app.shrd_mem_buffers.deinit(app.allocator);

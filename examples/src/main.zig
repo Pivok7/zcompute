@@ -17,9 +17,14 @@ pub fn main() !void {
     var gpu = try zcomp.GPU.init(
         allocator,
         .{
-            .enable_validation_layers = false,
+            .enable_validation_layers = true,
             .debug_mode = false,
             .features = .{ .float64 = true },
+            .vulkan_api_version = .{
+                .major = 1,
+                .minor = 4,
+                .patch = 0,
+            },
         },
     );
     defer gpu.deinit();
@@ -34,14 +39,13 @@ pub fn main() !void {
     const sm2 = try SharedMemory.Buffer.newSlice(
         f64, &.{ 2.0, 4.0, 5.0, 7.7, 8.0, 10.0, 16.0, 32.0, 64.0, 100.0 },
     );
-    // TODO: This is fake image2d for now
-    //const sm3 = try SharedMemory.Image2d.newEmpty(10, 1, .rgba8);
+    const sm3 = try SharedMemory.Image2d.newEmpty(10, 1, .rgba8);
 
     // Create an application
     var app = try zcomp.App.init(
         allocator,
         &gpu,
-        .{ .debug_mode = false },
+        .{ .debug_mode = true },
     );
     defer app.deinit();
 
@@ -49,6 +53,7 @@ pub fn main() !void {
     try app.bindMemory(&sm0, 0);
     try app.bindMemory(&sm1, 1);
     try app.bindMemory(&sm2, 2);
+    try app.bindMemory(&sm3, 3);
 
     // Load shader
     try app.loadShader(

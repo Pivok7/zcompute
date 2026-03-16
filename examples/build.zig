@@ -26,6 +26,7 @@ pub fn build(b: *std.Build) void {
         "slangc",
         "src/shader.slang",
         "-target", "spirv",
+        "-profile", "spirv_1_3",
         "-o", "src/shader.spv",
     });
 

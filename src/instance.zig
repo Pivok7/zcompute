@@ -21,12 +21,19 @@ pub fn createInstance(gpu: *const GPU) !vk.Instance {
         try checkValidationLayerSupport(gpu);
     }
 
+    const vulkan_api_version = gpu.options.vulkan_api_version;
+
     const app_info = vk.ApplicationInfo{
-        .p_application_name = "Vulkan",
+        .p_application_name = "zcompute application",
         .application_version = @bitCast(vk.makeApiVersion(0, 1, 0, 0)),
-        .p_engine_name = "No Engine",
+        .p_engine_name = "zcompute",
         .engine_version = @bitCast(vk.makeApiVersion(0, 1, 0, 0)),
-        .api_version = @bitCast(vk.makeApiVersion(0, 1, 3, 0)),
+        .api_version = @bitCast(vk.makeApiVersion(
+            0,
+            vulkan_api_version.major,
+            vulkan_api_version.minor,
+            vulkan_api_version.patch,
+        )),
     };
 
     const create_info = vk.InstanceCreateInfo{
