@@ -9,7 +9,7 @@ pub fn createDescriptorSetLayout(app: *const App) !vk.DescriptorSetLayout {
     var layout_bindings: std.ArrayList(vk.DescriptorSetLayoutBinding) = .empty;
     defer layout_bindings.deinit(app.allocator);
 
-    for (app.shrd_mem_buffers.items) |shrd_mem| {
+    for (app.shared_memories.items) |shrd_mem| {
         const descriptor_type: vk.DescriptorType = switch (shrd_mem.info) {
             .buffer => .storage_buffer,
             .image_2d => .combined_image_sampler,
@@ -84,6 +84,10 @@ pub fn createDescriptorPool(app: *const App) !vk.DescriptorPool {
         .{
             .type = .storage_buffer,
             .descriptor_count = @intCast(app.shrd_mem_buffers.items.len),
+        },
+        .{
+            .type = .combined_image_sampler,
+            .descriptor_count = @intCast(app.shrd_mem_images.items.len),
         }
     };
 
@@ -96,7 +100,7 @@ pub fn createDescriptorPool(app: *const App) !vk.DescriptorPool {
     return app.gpu.vkd.createDescriptorPool(app.gpu.device, &create_info, null);
 }
 
-pub fn createDescriptorSet(app: *const App) !vk.DescriptorSet {
+pub fn createDescriptorSets(app: *const App) !vk.DescriptorSet {
     const allocate_info = vk.DescriptorSetAllocateInfo{
         .descriptor_pool = app.descriptor_pool,
         .descriptor_set_count = 1,
@@ -125,6 +129,20 @@ pub fn createDescriptorSet(app: *const App) !vk.DescriptorSet {
         });
     }
 
+    var images_infos: std.ArrayList(vk.DescriptorImageInfo) = .empty;
+    defer images_infos.deinit(app.allocator);
+
+    for (
+        app.images_views.items,
+        app.images_samplers.items,
+    ) |img_view, sampler| {
+        try images_infos.append(app.allocator, .{
+            .image_view = img_view,
+            .sampler = sampler,
+            .image_layout = .general,
+        });
+    }
+
     var write_descriptor_sets: std.ArrayList(vk.WriteDescriptorSet) = .empty;
     defer write_descriptor_sets.deinit(app.allocator);
 
@@ -138,8 +156,24 @@ pub fn createDescriptorSet(app: *const App) !vk.DescriptorSet {
             .dst_array_element = 0,
             .descriptor_count = 1,
             .descriptor_type = .storage_buffer,
-            .p_image_info = undefined,
             .p_buffer_info = @ptrCast(buffer_info),
+            .p_image_info = undefined,
+            .p_texel_buffer_view = undefined,
+        });
+    }
+
+    for (
+        images_infos.items,
+        app.shrd_mem_images.items
+    ) |*img_info, shrd_mem| {
+        try write_descriptor_sets.append(app.allocator, .{
+            .dst_set = descriptor_set,
+            .dst_binding = shrd_mem.binding,
+            .dst_array_element = 0,
+            .descriptor_count = 1,
+            .descriptor_type = .combined_image_sampler,
+            .p_buffer_info = undefined,
+            .p_image_info = @ptrCast(img_info),
             .p_texel_buffer_view = undefined,
         });
     }

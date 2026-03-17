@@ -59,6 +59,59 @@ pub fn createImage(
     );
 }
 
+pub fn createImageView(app: *App, image: vk.Image, format: vk.Format) !vk.ImageView {
+    const image_view_create_info = vk.ImageViewCreateInfo{
+        .image = image,
+        .view_type = .@"2d",
+        .format = format,
+        .subresource_range = .{
+            .aspect_mask = .{ .color_bit = true },
+            .base_mip_level = 0,
+            .level_count = 1,
+            .base_array_layer = 0,
+            .layer_count = 1,
+        },
+        .components = .{
+            .r = .identity,
+            .g = .identity,
+            .b = .identity,
+            .a = .identity,
+        },
+    };
+
+    return app.gpu.vkd.createImageView(
+        app.gpu.device,
+        &image_view_create_info,
+        null
+    );
+}
+
+pub fn createTextureSampler(app: *App) !vk.Sampler {
+    const sampler_create_info = vk.SamplerCreateInfo{
+        .mag_filter = .linear,
+        .min_filter = .linear,
+        .mipmap_mode = .linear,
+        .address_mode_u = .repeat,
+        .address_mode_v = .repeat,
+        .address_mode_w = .repeat,
+        .anisotropy_enable = vk.FALSE,
+        .max_anisotropy = 0,
+        .compare_enable = vk.FALSE,
+        .compare_op = .always,
+        .border_color = .int_opaque_black,
+        .unnormalized_coordinates = vk.FALSE,
+        .mip_lod_bias = 0.0,
+        .min_lod = 0.0,
+        .max_lod = 0.0,
+    };
+
+    return try app.gpu.vkd.createSampler(
+        app.gpu.device,
+        &sampler_create_info,
+        null,
+    );
+}
+
 pub fn transitionImageLayout(
     app: *const App,
     image: vk.Image,

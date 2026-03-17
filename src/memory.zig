@@ -1,7 +1,7 @@
 const std = @import("std");
 const vk = @import("vulkan");
 const core = @import("core.zig");
-const image = @import("image.zig");
+const vkimg = @import("image.zig");
 
 const App = core.VulkanApp;
 
@@ -153,21 +153,21 @@ pub fn createImages(app: *App) !void {
         return;
     }
 
-    var image_: vk.Image = .null_handle;
-    var image_memory_: vk.DeviceMemory = .null_handle;
+    var image: vk.Image = .null_handle;
+    var image_memory: vk.DeviceMemory = .null_handle;
 
     const img = app.shrd_mem_images.items[0];
     const img_info = img.info.image_2d;
-    try image.createImage(
+    try vkimg.createImage(
         app,
         img_info.width,
         img_info.height,
-        .r8g8b8a8_srgb,
+        .r8g8b8a8_uint,
         .optimal,
         .{ .sampled_bit = true, .transfer_dst_bit = true, .transfer_src_bit = true },
         .{ .device_local_bit = true },
-        &image_,
-        &image_memory_,
+        &image,
+        &image_memory,
     );
 
 
@@ -208,35 +208,45 @@ pub fn createImages(app: *App) !void {
         0
     );
 
-    try app.images.append(app.allocator, image_);
-    app.images_memory = image_memory_;
+    try app.images.append(app.allocator, image);
+    app.images_memory = image_memory;
 
-    try image.transitionImageLayout(
+    try vkimg.transitionImageLayout(
         app,
-        image_,
+        image,
         .undefined,
         .transfer_dst_optimal,
     );
 
-    try image.copyBufferToImage(
+    try vkimg.copyBufferToImage(
         app,
         staging_buffer,
-        image_,
+        image,
         img_info.width,
         img_info.height
     );
 
-    try image.transitionImageLayout(
+    try vkimg.transitionImageLayout(
         app,
-        image_,
+        image,
         .transfer_dst_optimal,
         .general,
     );
 
-    try image.copyImageToBuffer(
+    const image_view = try vkimg.createImageView(
+        app,
+        image,
+        .r8g8b8a8_uint
+    );
+    try app.images_views.append(app.allocator, image_view);
+
+    const image_sampler = try vkimg.createTextureSampler(app);
+    try app.images_samplers.append(app.allocator, image_sampler);
+
+    try vkimg.copyImageToBuffer(
         app,
         staging_buffer,
-        image_,
+        image,
         img_info.width,
         img_info.height
     );

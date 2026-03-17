@@ -58,7 +58,7 @@ pub fn main() !void {
     // Load shader
     try app.loadShader(
         "src/shader.spv",
-        .{ .x = 10, .y = 1, .z = 1 },
+        .{ .x = 4, .y = 1, .z = 1 },
     );
 
     // Build the compute pipeline

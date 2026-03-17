@@ -167,8 +167,8 @@ pub const VulkanApp = struct {
     buffers_memory: vk.DeviceMemory = .null_handle,
 
     images: std.ArrayList(vk.Image) = .empty,
-    images_views: std.ArrayList(vk.ImageView) = .empty,
     images_memory: vk.DeviceMemory = .null_handle,
+    images_views: std.ArrayList(vk.ImageView) = .empty,
     images_samplers: std.ArrayList(vk.Sampler) = .empty,
 
     shader: ?Shader = null,
@@ -268,7 +268,7 @@ pub const VulkanApp = struct {
         app.pipeline_layout = try pipeline.createPipelineLayout(app);
         app.pipeline_cache = try pipeline.createPipelineCache(app);
         app.compute_pipeline = try pipeline.createPipeline(app);
-        app.descriptor_set = try pipeline.createDescriptorSet(app);
+        app.descriptor_set = try pipeline.createDescriptorSets(app);
         app.log(.info, "Created compute pipeline", .{});
 
         app.command_buffer = try command.createCommandBuffer(app);
@@ -302,6 +302,10 @@ pub const VulkanApp = struct {
             app.gpu.vkd.destroyImageView(app.gpu.device, img_view, null);
         }
 
+        for (app.images_samplers.items) |img_sampler| {
+            app.gpu.vkd.destroySampler(app.gpu.device, img_sampler, null);
+        }
+
         app.gpu.vkd.freeMemory(app.gpu.device, app.images_memory, null);
 
         app.gpu.vkd.freeMemory(app.gpu.device, app.buffers_memory, null);
@@ -312,6 +316,7 @@ pub const VulkanApp = struct {
 
         app.images.deinit(app.allocator);
         app.images_views.deinit(app.allocator);
+        app.images_samplers.deinit(app.allocator);
         app.buffers_offsets.deinit(app.allocator);
         app.buffers.deinit(app.allocator);
         app.shrd_mem_buffers.deinit(app.allocator);
