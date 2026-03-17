@@ -86,32 +86,6 @@ pub fn createImageView(app: *App, image: vk.Image, format: vk.Format) !vk.ImageV
     );
 }
 
-pub fn createTextureSampler(app: *App) !vk.Sampler {
-    const sampler_create_info = vk.SamplerCreateInfo{
-        .mag_filter = .linear,
-        .min_filter = .linear,
-        .mipmap_mode = .linear,
-        .address_mode_u = .repeat,
-        .address_mode_v = .repeat,
-        .address_mode_w = .repeat,
-        .anisotropy_enable = vk.FALSE,
-        .max_anisotropy = 0,
-        .compare_enable = vk.FALSE,
-        .compare_op = .always,
-        .border_color = .int_opaque_black,
-        .unnormalized_coordinates = vk.FALSE,
-        .mip_lod_bias = 0.0,
-        .min_lod = 0.0,
-        .max_lod = 0.0,
-    };
-
-    return try app.gpu.vkd.createSampler(
-        app.gpu.device,
-        &sampler_create_info,
-        null,
-    );
-}
-
 pub fn transitionImageLayout(
     app: *const App,
     image: vk.Image,
@@ -120,7 +94,7 @@ pub fn transitionImageLayout(
 ) !void {
     const command_buffer = try command.beginSingleTimeCommands(app);
 
-    var barrier = vk.ImageMemoryBarrier2{
+    var barrier1 = vk.ImageMemoryBarrier{
         .old_layout = old_layout,
         .new_layout = new_layout,
         .image = image,
@@ -135,42 +109,46 @@ pub fn transitionImageLayout(
         .dst_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
         .src_access_mask = .{},
         .dst_access_mask = .{},
-        .src_stage_mask = .{},
-        .dst_stage_mask = .{},
     };
 
+    var src_stage_mask: vk.PipelineStageFlags = .{};
+    var dst_stage_mask: vk.PipelineStageFlags = .{};
+
     if (old_layout == .undefined and new_layout == .transfer_dst_optimal) {
-        barrier.src_access_mask = .{};
-        barrier.dst_access_mask = .{ .transfer_write_bit = true };
-        barrier.src_stage_mask = .{ .top_of_pipe_bit = true };
-        barrier.dst_stage_mask = .{ .all_transfer_bit = true };
+        barrier1.src_access_mask = .{};
+        barrier1.dst_access_mask = .{ .transfer_write_bit = true };
+        src_stage_mask = .{ .top_of_pipe_bit = true };
+        dst_stage_mask = .{ .transfer_bit = true };
 
     } else if (old_layout == .transfer_dst_optimal and new_layout == .general) {
-        barrier.src_access_mask = .{ .transfer_write_bit = true };
-        barrier.dst_access_mask = .{ .shader_storage_write_bit = true, .shader_read_bit = true };
-        barrier.src_stage_mask = .{ .all_transfer_bit = true };
-        barrier.dst_stage_mask = .{ .compute_shader_bit = true };
+        barrier1.src_access_mask = .{ .transfer_write_bit = true };
+        barrier1.dst_access_mask = .{ .shader_write_bit = true, .shader_read_bit = true };
+        src_stage_mask = .{ .transfer_bit = true };
+        dst_stage_mask = .{ .compute_shader_bit = true };
 
     } else {
         std.log.err("Invalid layout transition", .{});
         return error.InvalidLayoutTransition;
     }
 
-    const dependency_info = vk.DependencyInfo{
-        .image_memory_barrier_count = 1,
-        .p_image_memory_barriers = @ptrCast(&barrier),
-    };
-
-    app.gpu.vkd.cmdPipelineBarrier2(
+    app.gpu.vkd.cmdPipelineBarrier(
         command_buffer,
-        &dependency_info,
+        src_stage_mask,
+        dst_stage_mask,
+        .{},
+        0,
+        null,
+        0,
+        null,
+        1,
+        @ptrCast(&barrier1),
     );
 
     try command.endSingleTimeCommands(app, command_buffer);
 }
 
 pub fn copyBufferToImage(
-    app: *App,
+    app: *const App,
     buffer: vk.Buffer,
     image: vk.Image,
     width: u32,
@@ -209,7 +187,7 @@ pub fn copyBufferToImage(
 }
 
 pub fn copyImageToBuffer(
-    app: *App,
+    app: *const App,
     buffer: vk.Buffer,
     image: vk.Image,
     width: u32,

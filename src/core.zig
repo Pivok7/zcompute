@@ -279,6 +279,7 @@ pub const VulkanApp = struct {
         app.log(.info, "Submitting work...", .{});
         try command.submitWork(app);
         app.log(.info, "Work finished", .{});
+        try memory.dbgReadImage(app);
     }
 
     pub fn deinit(app: *Self) void {

@@ -77,6 +77,7 @@ pub const Image2d = struct {
     pub const Format = enum {
         rgb8,
         rgba8,
+        r32g32b32a32_sfloat,
     };
 
     width: u32,
@@ -92,6 +93,7 @@ pub const Image2d = struct {
         return switch (self.format) {
             .rgb8 => @sizeOf(u8) * 3,
             .rgba8 => @sizeOf(u8) * 4,
+            .r32g32b32a32_sfloat => @sizeOf(f32) * 4,
         };
     }
 

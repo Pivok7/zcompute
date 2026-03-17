@@ -12,7 +12,7 @@ pub fn createDescriptorSetLayout(app: *const App) !vk.DescriptorSetLayout {
     for (app.shared_memories.items) |shrd_mem| {
         const descriptor_type: vk.DescriptorType = switch (shrd_mem.info) {
             .buffer => .storage_buffer,
-            .image_2d => .combined_image_sampler,
+            .image_2d => .storage_image,
         };
 
         try layout_bindings.append(app.allocator, .{
@@ -86,7 +86,7 @@ pub fn createDescriptorPool(app: *const App) !vk.DescriptorPool {
             .descriptor_count = @intCast(app.shrd_mem_buffers.items.len),
         },
         .{
-            .type = .combined_image_sampler,
+            .type = .storage_image,
             .descriptor_count = @intCast(app.shrd_mem_images.items.len),
         }
     };
@@ -132,13 +132,10 @@ pub fn createDescriptorSets(app: *const App) !vk.DescriptorSet {
     var images_infos: std.ArrayList(vk.DescriptorImageInfo) = .empty;
     defer images_infos.deinit(app.allocator);
 
-    for (
-        app.images_views.items,
-        app.images_samplers.items,
-    ) |img_view, sampler| {
+    for (app.images_views.items) |img_view| {
         try images_infos.append(app.allocator, .{
             .image_view = img_view,
-            .sampler = sampler,
+            .sampler = .null_handle,
             .image_layout = .general,
         });
     }
@@ -171,7 +168,7 @@ pub fn createDescriptorSets(app: *const App) !vk.DescriptorSet {
             .dst_binding = shrd_mem.binding,
             .dst_array_element = 0,
             .descriptor_count = 1,
-            .descriptor_type = .combined_image_sampler,
+            .descriptor_type = .storage_image,
             .p_buffer_info = undefined,
             .p_image_info = @ptrCast(img_info),
             .p_texel_buffer_view = undefined,

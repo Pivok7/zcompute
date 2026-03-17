@@ -39,7 +39,7 @@ pub fn main() !void {
     const sm2 = try SharedMemory.Buffer.newSlice(
         f64, &.{ 2.0, 4.0, 5.0, 7.7, 8.0, 10.0, 16.0, 32.0, 64.0, 100.0 },
     );
-    const sm3 = try SharedMemory.Image2d.newEmpty(10, 1, .rgba8);
+    const sm3 = try SharedMemory.Image2d.newEmpty(10, 1, .r32g32b32a32_sfloat);
 
     // Create an application
     var app = try zcomp.App.init(
@@ -58,7 +58,7 @@ pub fn main() !void {
     // Load shader
     try app.loadShader(
         "src/shader.spv",
-        .{ .x = 4, .y = 1, .z = 1 },
+        .{ .x = 10, .y = 1, .z = 1 },
     );
 
     // Build the compute pipeline
