@@ -197,7 +197,7 @@ pub fn createImages(app: *App) !void {
             0,
             img.size(),
         );
-        @memset(mapped_memory, 100);
+        @memset(mapped_memory, 255);
         app.gpu.vkd.unmapMemory(app.gpu.device, staging_buffer_memory);
     }
 
@@ -239,24 +239,6 @@ pub fn createImages(app: *App) !void {
         .r32g32b32a32_sfloat
     );
     try app.images_views.append(app.allocator, image_view);
-
-    try vkimg.copyImageToBuffer(
-        app,
-        staging_buffer,
-        image,
-        img_info.width,
-        img_info.height
-    );
-
-    {
-        const mapped_memory2 = try mapMemory(
-            app,
-            staging_buffer_memory,
-            0,
-            img.size(),
-        );
-        std.debug.print("{any}\n", .{mapped_memory2});
-    }
 }
 
 pub fn dbgReadImage(app: *const App) !void {

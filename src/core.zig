@@ -169,7 +169,6 @@ pub const VulkanApp = struct {
     images: std.ArrayList(vk.Image) = .empty,
     images_memory: vk.DeviceMemory = .null_handle,
     images_views: std.ArrayList(vk.ImageView) = .empty,
-    images_samplers: std.ArrayList(vk.Sampler) = .empty,
 
     shader: ?Shader = null,
 
@@ -276,6 +275,7 @@ pub const VulkanApp = struct {
     }
 
     pub fn run(app: *const Self) !void {
+        try memory.dbgReadImage(app);
         app.log(.info, "Submitting work...", .{});
         try command.submitWork(app);
         app.log(.info, "Work finished", .{});
@@ -303,10 +303,6 @@ pub const VulkanApp = struct {
             app.gpu.vkd.destroyImageView(app.gpu.device, img_view, null);
         }
 
-        for (app.images_samplers.items) |img_sampler| {
-            app.gpu.vkd.destroySampler(app.gpu.device, img_sampler, null);
-        }
-
         app.gpu.vkd.freeMemory(app.gpu.device, app.images_memory, null);
 
         app.gpu.vkd.freeMemory(app.gpu.device, app.buffers_memory, null);
@@ -317,7 +313,6 @@ pub const VulkanApp = struct {
 
         app.images.deinit(app.allocator);
         app.images_views.deinit(app.allocator);
-        app.images_samplers.deinit(app.allocator);
         app.buffers_offsets.deinit(app.allocator);
         app.buffers.deinit(app.allocator);
         app.shrd_mem_buffers.deinit(app.allocator);
