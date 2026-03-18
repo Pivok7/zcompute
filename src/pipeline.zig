@@ -87,7 +87,7 @@ pub fn createDescriptorPool(app: *const App) !vk.DescriptorPool {
         },
         .{
             .type = .storage_image,
-            .descriptor_count = @intCast(app.sm_images2d.items.len),
+            .descriptor_count = @intCast(app.sm_images_2d.items.len),
         }
     };
 
@@ -161,7 +161,7 @@ pub fn createDescriptorSets(app: *const App) !vk.DescriptorSet {
 
     for (
         images_infos.items,
-        app.sm_images2d.items
+        app.sm_images_2d.items
     ) |*img_info, sm_img| {
         try write_descriptor_sets.append(app.allocator, .{
             .dst_set = descriptor_set,

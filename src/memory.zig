@@ -121,17 +121,18 @@ pub fn createBuffers(app: *App) !void {
         .{ .host_visible_bit = true, .host_coherent_bit = true },
     );
 
+    const mapped_memory = try mapMemory(
+        app,
+        app.buffers_memory,
+        0,
+        total_buffers_size,
+    );
+
     for (app.sm_buffers.items, app.buffers.items, app.buffers_offsets.items)
         |sm_buf, buf, offset| {
         if (sm_buf.data != null) {
-            const mapped_memory = try mapMemory(
-                app,
-                app.buffers_memory,
-                offset,
-                sm_buf.size()
-            );
-            @memcpy(mapped_memory, sm_buf.dataAsSlice(u8));
-            app.gpu.vkd.unmapMemory(app.gpu.device, app.buffers_memory);
+            const data = sm_buf.dataAsSlice(u8);
+            @memcpy(mapped_memory[offset..(offset + data.len)], data);
         }
 
         try app.gpu.vkd.bindBufferMemory(
@@ -147,16 +148,18 @@ pub fn createBuffers(app: *App) !void {
             .{ sm_buf.binding, sm_buf.size() }
         );
     }
+
+    app.mapped_memory_buffers = mapped_memory;
 }
 
 
 pub fn createImages(app: *App) !void {
-    if (app.sm_images2d.items.len == 0) {
+    if (app.sm_images_2d.items.len == 0) {
         app.log(.debug, "No images found, skipping...", .{});
         return;
     }
 
-    for (app.sm_images2d.items) |sm_img| {
+    for (app.sm_images_2d.items) |sm_img| {
         const img = sm_img;
         const img_info = img.info.image_2d;
         const image = try vkimg.createImage(
@@ -180,7 +183,7 @@ pub fn createImages(app: *App) !void {
     );
 
     var total_buffers_device_size: usize = 0;
-    for (app.sm_images2d.items, app.images.items) |sm_img, image| {
+    for (app.sm_images_2d.items, app.images.items) |sm_img, image| {
         const mem_req = app.gpu.vkd.getImageMemoryRequirements(
             app.gpu.device,
             image,
@@ -215,7 +218,7 @@ pub fn createImages(app: *App) !void {
         );
     }
 
-    for (app.sm_images2d.items) |sm_img| {
+    for (app.sm_images_2d.items) |sm_img| {
         const staging_buffer = try createBuffer(app, sm_img.size(), .{
             .transfer_src_bit = true,
             .transfer_dst_bit = true,
@@ -229,7 +232,7 @@ pub fn createImages(app: *App) !void {
     );
 
     var total_buffers_host_size: usize = 0;
-    for (app.sm_images2d.items) |sm_img| {
+    for (app.sm_images_2d.items) |sm_img| {
         try app.images_buffers_offsets_host.append(app.allocator, total_buffers_host_size);
         total_buffers_host_size += std.mem.alignForward(
             usize,
@@ -258,19 +261,24 @@ pub fn createImages(app: *App) !void {
         );
     }
 
-    for (app.sm_images2d.items, app.images.items, app.images_buffers.items, app.images_buffers_offsets_host.items)
-        |sm_img, image, img_buf, offset| {
+    const mapped_memory = try mapMemory(
+        app,
+        app.images_memory_host,
+        0,
+        total_buffers_host_size,
+    );
+
+    for (
+        app.sm_images_2d.items,
+        app.images.items,
+        app.images_buffers.items,
+        app.images_buffers_offsets_host.items
+    ) |sm_img, image, img_buf, offset| {
         const img_info = sm_img.info.image_2d;
 
         if (sm_img.data != null) {
-            const mapped_memory = try mapMemory(
-                app,
-                app.images_memory_host,
-                offset,
-                sm_img.size(),
-            );
-            @memcpy(mapped_memory, sm_img.dataAsSlice(u8));
-            app.gpu.vkd.unmapMemory(app.gpu.device, app.images_memory_host);
+            const data = sm_img.dataAsSlice(u8);
+            @memcpy(mapped_memory[offset..(offset + data.len)], data);
         }
 
         try vkimg.transitionImageLayout(
@@ -302,10 +310,12 @@ pub fn createImages(app: *App) !void {
         );
         try app.images_views.append(app.allocator, image_view);
     }
+
+    app.mapped_memory_images = mapped_memory;
 }
 
-pub fn mapImage(app: *const App, img_index: usize) ![]u8 {
-    const img = app.sm_images2d.items[img_index];
+pub fn mapImage(app: *const App, img_index: usize) !void {
+    const img = app.sm_images_2d.items[img_index];
     const img_info = img.info.image_2d;
 
     try vkimg.copyImageToBuffer(
@@ -315,12 +325,4 @@ pub fn mapImage(app: *const App, img_index: usize) ![]u8 {
         img_info.width,
         img_info.height
     );
-
-    return try mapMemory(
-        app,
-        app.images_memory_host,
-        app.images_buffers_offsets_host.items[img_index],
-        img.size(),
-    );
-    //defer app.gpu.vkd.unmapMemory(app.gpu.device, app.images_memory_host);
 }

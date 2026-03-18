@@ -160,7 +160,7 @@ pub const VulkanApp = struct {
 
     shared_memories: std.ArrayList(SharedMemory) = .empty,
     sm_buffers: std.ArrayList(*const SharedMemory) = .empty,
-    sm_images2d: std.ArrayList(*const SharedMemory) = .empty,
+    sm_images_2d: std.ArrayList(*const SharedMemory) = .empty,
 
     buffers: std.ArrayList(vk.Buffer) = .empty,
     buffers_offsets: std.ArrayList(usize) = .empty,
@@ -173,6 +173,9 @@ pub const VulkanApp = struct {
     images_buffers: std.ArrayList(vk.Buffer) = .empty,
     images_buffers_offsets_host: std.ArrayList(usize) = .empty,
     images_buffers_offsets_device: std.ArrayList(usize) = .empty,
+
+    mapped_memory_buffers: []u8 = &.{},
+    mapped_memory_images: []u8 = &.{},
 
     shader: ?Shader = null,
 
@@ -257,7 +260,7 @@ pub const VulkanApp = struct {
         for (app.shared_memories.items) |*sm| {
             switch (sm.info) {
                 .buffer => try app.sm_buffers.append(app.allocator, sm),
-                .image_2d => try app.sm_images2d.append(app.allocator, sm),
+                .image_2d => try app.sm_images_2d.append(app.allocator, sm),
             }
         }
 
@@ -326,110 +329,45 @@ pub const VulkanApp = struct {
 
         app.buffers.deinit(app.allocator);
         app.sm_buffers.deinit(app.allocator);
-        app.sm_images2d.deinit(app.allocator);
+        app.sm_images_2d.deinit(app.allocator);
         app.shared_memories.deinit(app.allocator);
     }
 
-    /// Only one buffer/image can be mapped at once
-    /// Remember to unmap memory after using it
-    pub fn mapMemory(app: *const Self, T: type, binding: u32) ![]T {
+    pub fn getMemory(app: *const Self, T: type, binding: u32) ![]T {
         const index = try app.getBindingIndex(binding);
         const sm = app.shared_memories.items[index];
 
-        const opaque_mem = try app.gpu.vkd.mapMemory(
-            app.gpu.device,
-            app.buffers_memory,
-            app.buffers_offsets.items[index],
-            sm.size(),
-            .{},
-        ) orelse {
-            return error.MemoryMapFailed;
-        };
-
-        return @as([*]T, @alignCast(@ptrCast(opaque_mem)))[0..sm.size()];
-    }
-
-    /// Only one buffer/image can be mapped at once
-    /// Remember to unmap memory after using it
-    pub fn mapMemoryOpaque(app: *const Self, binding: u32) !*anyopaque {
-        const index = try app.getBindingIndex(binding);
-        const sm = app.shared_memories.items[index];
-
-        return try app.gpu.vkd.mapMemory(
-            app.gpu.device,
-            app.buffers_memory,
-            app.buffers_offsets.items[index],
-            sm.size(),
-            .{},
-        ) orelse {
-            return error.MemoryMapFailed;
-        };
-    }
-
-    pub fn unmapMemory(app: *const Self) void {
-        app.gpu.vkd.unmapMemory(app.gpu.device, app.buffers_memory);
-    }
-
-    // Read data from SharedMemory to a buffer
-    // Unlike mapMemory this data is inmutable
-    pub fn getData(
-        app: *const Self,
-        buf: anytype,
-        binding: u32,
-    ) !void {
-        const index = try app.getBindingIndex(binding);
-        const sm = app.shared_memories.items[index];
-
-        var mapped_memory: []u8 = &.{};
+        var mapped_range: []u8 = &.{};
 
         switch (sm.info) {
             .buffer => {
-                mapped_memory = try memory.mapMemory(
-                    app,
-                    app.buffers_memory,
-                    app.buffers_offsets.items[index],
-                    sm.size(),
-                );
+                for (app.sm_buffers.items, 0..) |sm_buf, i| {
+                    if (sm_buf.binding == binding) {
+                        const offset = app.buffers_offsets.items[i];
+                        const data_len = sm.size();
+                        mapped_range = app.mapped_memory_buffers[
+                            offset..(offset + data_len)
+                        ];
+                    }
+                }
             },
             .image_2d => {
-                for (app.sm_images2d.items, 0..) |sm_img, i| {
+                for (app.sm_images_2d.items, 0..) |sm_img, i| {
                     if (sm_img.binding == binding) {
-                        mapped_memory = try memory.mapImage(app, i);
+                        try memory.mapImage(app, i);
+                        const offset = app.images_buffers_offsets_host.items[i];
+                        const data_len = sm.size();
+                        mapped_range = app.mapped_memory_images[
+                            offset..(offset + data_len)
+                        ];
                     }
                 }
             }
         }
 
-        @memcpy(buf, @as(@TypeOf(buf), @ptrCast(@alignCast(mapped_memory))));
-
-        switch (sm.info) {
-            .buffer => {
-                app.gpu.vkd.unmapMemory(app.gpu.device, app.buffers_memory);
-            },
-            .image_2d => {
-                app.gpu.vkd.unmapMemory(app.gpu.device, app.images_memory_host);
-            }
-        }
-    }
-
-    // Read data from SharedMemory and allocate it
-    // Unlike mapMemory this data is inmutable
-    pub fn getDataAlloc(
-        app: *const Self,
-        allocator: Allocator,
-        binding: u32,
-        T: type
-    ) ![]T {
-        const index = try app.getBindingIndex(binding);
-
-        const buf = try allocator.alloc(
-            T,
-            app.shared_memories.items[index].size() / @sizeOf(T)
-        );
-
-        try app.getData(buf, binding);
-
-        return buf;
+        return @as([*]T, @alignCast(@ptrCast(mapped_range)))[
+            0..sm.size() / @sizeOf(T)
+        ];
     }
 
     // TODO: probably good idea to use hash map here

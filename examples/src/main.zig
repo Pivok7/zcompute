@@ -16,7 +16,7 @@ pub fn main() !void {
             .features = .{ .float64 = true },
             .vulkan_api_version = .{
                 .major = 1,
-                .minor = 4,
+                .minor = 1,
                 .patch = 0,
             },
         },
@@ -59,26 +59,18 @@ pub fn main() !void {
     try app.submit();
 
     // Example of editing the memory
-    var mapped_memory = try app.mapMemory(u32, 0);
-    mapped_memory[0] = 10;
-    app.unmapMemory();
+    var sm1_memory = try app.getMemory(u32, 0);
+    sm1_memory[0] = 10;
 
     // Run the application
     // Can be called many times
     try app.run();
 
     // Collect the output
-    const one = try app.getDataAlloc(allocator, 0, u32);
-    defer allocator.free(one);
-
-    const two = try app.getDataAlloc(allocator, 1, f32);
-    defer allocator.free(two);
-
-    const three = try app.getDataAlloc(allocator, 2, f64);
-    defer allocator.free(three);
-
-    const four = try app.getDataAlloc(allocator, 3, f32);
-    defer allocator.free(four);
+    const one = try app.getMemory(u32, 0);
+    const two = try app.getMemory(f32, 1);
+    const three = try app.getMemory(f64, 2);
+    const four = try app.getMemory(f32, 3);
 
     std.debug.print("Output:\n", .{});
     std.debug.print("{any}\n", .{one});
