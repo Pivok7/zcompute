@@ -2,12 +2,6 @@ const std = @import("std");
 const zcomp = @import("zcompute");
 const SharedMemory = zcomp.SharedMemory;
 
-pub fn editFunc(data: []u8, shrd_mem: *const SharedMemory) void {
-    // Add 5 to last element
-    const buffer_slice = @as([]u32, @ptrCast(@alignCast(data)));
-    buffer_slice[shrd_mem.elem_num() - 1] += 5;
-}
-
 pub fn main() !void {
     var dba = std.heap.DebugAllocator(.{}){};
     defer _ = dba.deinit();
@@ -17,7 +11,7 @@ pub fn main() !void {
     var gpu = try zcomp.GPU.init(
         allocator,
         .{
-            .enable_validation_layers = true,
+            .enable_validation_layers = false,
             .debug_mode = false,
             .features = .{ .float64 = true },
             .vulkan_api_version = .{
@@ -39,13 +33,13 @@ pub fn main() !void {
     const sm2 = try SharedMemory.Buffer.newSlice(
         f64, &.{ 2.0, 4.0, 5.0, 7.7, 8.0, 10.0, 16.0, 32.0, 64.0, 100.0 },
     );
-    const sm3 = try SharedMemory.Image2d.newEmpty(10, 1, .r32g32b32a32_sfloat);
+    const sm3 = try SharedMemory.Image2d.newEmpty(10, 2, .r32g32b32a32_sfloat);
 
     // Create an application
     var app = try zcomp.App.init(
         allocator,
         &gpu,
-        .{ .debug_mode = true },
+        .{ .debug_mode = false },
     );
     defer app.deinit();
 
@@ -65,8 +59,9 @@ pub fn main() !void {
     try app.submit();
 
     // Example of editing the memory
-    // Editing takes place in a function called editFunc
-    try app.editData(0, editFunc);
+    var mapped_memory = try app.mapMemory(u32, 0);
+    mapped_memory[0] = 10;
+    app.unmapMemory();
 
     // Run the application
     // Can be called many times
@@ -82,8 +77,12 @@ pub fn main() !void {
     const three = try app.getDataAlloc(allocator, 2, f64);
     defer allocator.free(three);
 
+    const four = try app.getDataAlloc(allocator, 3, f32);
+    defer allocator.free(four);
+
     std.debug.print("Output:\n", .{});
     std.debug.print("{any}\n", .{one});
     std.debug.print("{any}\n", .{two});
     std.debug.print("{any}\n", .{three});
+    std.debug.print("{any}\n", .{four});
 }

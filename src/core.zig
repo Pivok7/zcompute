@@ -159,16 +159,20 @@ pub const VulkanApp = struct {
     gpu: *const VulkanGPU = undefined,
 
     shared_memories: std.ArrayList(SharedMemory) = .empty,
-    shrd_mem_buffers: std.ArrayList(*const SharedMemory) = .empty,
-    shrd_mem_images: std.ArrayList(*const SharedMemory) = .empty,
+    sm_buffers: std.ArrayList(*const SharedMemory) = .empty,
+    sm_images2d: std.ArrayList(*const SharedMemory) = .empty,
 
     buffers: std.ArrayList(vk.Buffer) = .empty,
     buffers_offsets: std.ArrayList(usize) = .empty,
     buffers_memory: vk.DeviceMemory = .null_handle,
 
     images: std.ArrayList(vk.Image) = .empty,
-    images_memory: vk.DeviceMemory = .null_handle,
+    images_memory_host: vk.DeviceMemory = .null_handle,
+    images_memory_device: vk.DeviceMemory = .null_handle,
     images_views: std.ArrayList(vk.ImageView) = .empty,
+    images_buffers: std.ArrayList(vk.Buffer) = .empty,
+    images_buffers_offsets_host: std.ArrayList(usize) = .empty,
+    images_buffers_offsets_device: std.ArrayList(usize) = .empty,
 
     shader: ?Shader = null,
 
@@ -242,18 +246,18 @@ pub const VulkanApp = struct {
         );
         defer binding_set.deinit();
 
-        for (app.shared_memories.items) |*shrd_mem| {
-            const res = try binding_set.fetchPut(shrd_mem.binding, {});
+        for (app.shared_memories.items) |*sm| {
+            const res = try binding_set.fetchPut(sm.binding, {});
             if (res) |e| {
                 app.log(.err, "Found duplicate binding: {d}", .{e.key});
                 return error.DuplicateBinding;
             }
         }
 
-        for (app.shared_memories.items) |*shrd_mem| {
-            switch (shrd_mem.info) {
-                .buffer => try app.shrd_mem_buffers.append(app.allocator, shrd_mem),
-                .image_2d => try app.shrd_mem_images.append(app.allocator, shrd_mem),
+        for (app.shared_memories.items) |*sm| {
+            switch (sm.info) {
+                .buffer => try app.sm_buffers.append(app.allocator, sm),
+                .image_2d => try app.sm_images2d.append(app.allocator, sm),
             }
         }
 
@@ -275,11 +279,9 @@ pub const VulkanApp = struct {
     }
 
     pub fn run(app: *const Self) !void {
-        try memory.dbgReadImage(app);
         app.log(.info, "Submitting work...", .{});
         try command.submitWork(app);
         app.log(.info, "Work finished", .{});
-        try memory.dbgReadImage(app);
     }
 
     pub fn deinit(app: *Self) void {
@@ -303,8 +305,12 @@ pub const VulkanApp = struct {
             app.gpu.vkd.destroyImageView(app.gpu.device, img_view, null);
         }
 
-        app.gpu.vkd.freeMemory(app.gpu.device, app.images_memory, null);
+        for (app.images_buffers.items) |img_buf| {
+            app.gpu.vkd.destroyBuffer(app.gpu.device, img_buf, null);
+        }
 
+        app.gpu.vkd.freeMemory(app.gpu.device, app.images_memory_host, null);
+        app.gpu.vkd.freeMemory(app.gpu.device, app.images_memory_device, null);
         app.gpu.vkd.freeMemory(app.gpu.device, app.buffers_memory, null);
 
         for (app.buffers.items) |buf| {
@@ -313,60 +319,101 @@ pub const VulkanApp = struct {
 
         app.images.deinit(app.allocator);
         app.images_views.deinit(app.allocator);
+        app.images_buffers.deinit(app.allocator);
         app.buffers_offsets.deinit(app.allocator);
+        app.images_buffers_offsets_host.deinit(app.allocator);
+        app.images_buffers_offsets_device.deinit(app.allocator);
+
         app.buffers.deinit(app.allocator);
-        app.shrd_mem_buffers.deinit(app.allocator);
-        app.shrd_mem_images.deinit(app.allocator);
+        app.sm_buffers.deinit(app.allocator);
+        app.sm_images2d.deinit(app.allocator);
         app.shared_memories.deinit(app.allocator);
     }
 
-    /// This function takes another function as a parameter
-    /// which should implement code for editing the buffer.
-    /// It's parameters are:
-    /// -> u8[] - buffer
-    /// -> usize - element size
-    pub fn editData(
-        app: *const Self,
-        binding: u32,
-        func: *const fn(data: []u8, shrd_mem: *const SharedMemory) void
-    ) !void {
+    /// Only one buffer/image can be mapped at once
+    /// Remember to unmap memory after using it
+    pub fn mapMemory(app: *const Self, T: type, binding: u32) ![]T {
         const index = try app.getBindingIndex(binding);
+        const sm = app.shared_memories.items[index];
 
-        const shrd_mem = app.shared_memories.items[index];
-
-        const mapped_memory = try memory.mapMemory(
-            app,
+        const opaque_mem = try app.gpu.vkd.mapMemory(
+            app.gpu.device,
             app.buffers_memory,
             app.buffers_offsets.items[index],
-            shrd_mem.size(),
-        );
+            sm.size(),
+            .{},
+        ) orelse {
+            return error.MemoryMapFailed;
+        };
 
-        func(mapped_memory, &shrd_mem);
+        return @as([*]T, @alignCast(@ptrCast(opaque_mem)))[0..sm.size()];
+    }
 
+    /// Only one buffer/image can be mapped at once
+    /// Remember to unmap memory after using it
+    pub fn mapMemoryOpaque(app: *const Self, binding: u32) !*anyopaque {
+        const index = try app.getBindingIndex(binding);
+        const sm = app.shared_memories.items[index];
+
+        return try app.gpu.vkd.mapMemory(
+            app.gpu.device,
+            app.buffers_memory,
+            app.buffers_offsets.items[index],
+            sm.size(),
+            .{},
+        ) orelse {
+            return error.MemoryMapFailed;
+        };
+    }
+
+    pub fn unmapMemory(app: *const Self) void {
         app.gpu.vkd.unmapMemory(app.gpu.device, app.buffers_memory);
     }
 
+    // Read data from SharedMemory to a buffer
+    // Unlike mapMemory this data is inmutable
     pub fn getData(
         app: *const Self,
         buf: anytype,
         binding: u32,
     ) !void {
         const index = try app.getBindingIndex(binding);
+        const sm = app.shared_memories.items[index];
 
-        const shrd_mem = app.shared_memories.items[index];
+        var mapped_memory: []u8 = &.{};
 
-        const mapped_memory = try memory.mapMemory(
-            app,
-            app.buffers_memory,
-            app.buffers_offsets.items[index],
-            shrd_mem.size(),
-        );
+        switch (sm.info) {
+            .buffer => {
+                mapped_memory = try memory.mapMemory(
+                    app,
+                    app.buffers_memory,
+                    app.buffers_offsets.items[index],
+                    sm.size(),
+                );
+            },
+            .image_2d => {
+                for (app.sm_images2d.items, 0..) |sm_img, i| {
+                    if (sm_img.binding == binding) {
+                        mapped_memory = try memory.mapImage(app, i);
+                    }
+                }
+            }
+        }
 
         @memcpy(buf, @as(@TypeOf(buf), @ptrCast(@alignCast(mapped_memory))));
 
-        app.gpu.vkd.unmapMemory(app.gpu.device, app.buffers_memory);
+        switch (sm.info) {
+            .buffer => {
+                app.gpu.vkd.unmapMemory(app.gpu.device, app.buffers_memory);
+            },
+            .image_2d => {
+                app.gpu.vkd.unmapMemory(app.gpu.device, app.images_memory_host);
+            }
+        }
     }
 
+    // Read data from SharedMemory and allocate it
+    // Unlike mapMemory this data is inmutable
     pub fn getDataAlloc(
         app: *const Self,
         allocator: Allocator,
@@ -377,7 +424,7 @@ pub const VulkanApp = struct {
 
         const buf = try allocator.alloc(
             T,
-            app.shared_memories.items[index].elem_num()
+            app.shared_memories.items[index].size() / @sizeOf(T)
         );
 
         try app.getData(buf, binding);
@@ -395,8 +442,8 @@ pub const VulkanApp = struct {
 
     fn getBindingIndexOrNull(app: *const Self, binding: u32) ?u32 {
         var index_or_null: ?u32 = null;
-        for (app.shared_memories.items, 0..) |*shrd_mem, i| {
-            if (shrd_mem.binding == binding) {
+        for (app.shared_memories.items, 0..) |*sm, i| {
+            if (sm.binding == binding) {
                 index_or_null = @intCast(i);
                 break;
             }

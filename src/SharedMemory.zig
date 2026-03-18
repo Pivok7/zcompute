@@ -1,4 +1,5 @@
 const std = @import("std");
+const vk = @import("vulkan");
 
 const Self = @This();
 
@@ -28,6 +29,10 @@ pub fn elem_size(self: *const Self) usize {
         .buffer => |*buffer| buffer.elem_size,
         .image_2d => |*image_2d| image_2d.pixelSize(),
     };
+}
+
+pub fn dataAsSlice(self: *const Self, T: type) []const T {
+    return @as([*]const T, @alignCast(@ptrCast(self.data)))[0..self.size()];
 }
 
 pub const Buffer = struct {
@@ -75,9 +80,8 @@ pub const Buffer = struct {
 
 pub const Image2d = struct {
     pub const Format = enum {
-        rgb8,
-        rgba8,
         r32g32b32a32_sfloat,
+        //r8g8b8a8_uint,
     };
 
     width: u32,
@@ -91,9 +95,15 @@ pub const Image2d = struct {
 
     pub fn pixelSize(self: *const @This()) usize {
         return switch (self.format) {
-            .rgb8 => @sizeOf(u8) * 3,
-            .rgba8 => @sizeOf(u8) * 4,
             .r32g32b32a32_sfloat => @sizeOf(f32) * 4,
+            //.r8g8b8a8_uint => @sizeOf(u8) * 4,
+        };
+    }
+
+    pub fn toVulkanFormat(self: *const @This()) vk.Format {
+        return switch (self.format) {
+            .r32g32b32a32_sfloat => .r32g32b32a32_sfloat,
+            //.r8g8b8a8_uint => .r8g8b8a8_uint,
         };
     }
 

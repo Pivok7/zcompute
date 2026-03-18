@@ -75,20 +75,20 @@ pub fn mapMemory(
         size,
         .{},
     ) orelse {
-        return error.MemoryMapFail;
+        return error.MemoryMapFailed;
     };
 
     return @as([*]u8, @ptrCast(buffer_opaque))[0..size];
 }
 
 pub fn createBuffers(app: *App) !void {
-    if (app.shrd_mem_buffers.items.len == 0) {
+    if (app.sm_buffers.items.len == 0) {
         app.log(.debug, "No buffers found, skipping...", .{});
         return;
     }
 
-    for (app.shrd_mem_buffers.items) |shrm_mem| {
-        const buffer = try createBuffer(app, shrm_mem.size(), .{ .storage_buffer_bit = true });
+    for (app.sm_buffers.items) |sm_buf| {
+        const buffer = try createBuffer(app, sm_buf.size(), .{ .storage_buffer_bit = true });
         try app.buffers.append(app.allocator, buffer);
     }
 
@@ -98,36 +98,39 @@ pub fn createBuffers(app: *App) !void {
         // have the same create info
         app.buffers.items[0]
     );
-    const mem_alignment = mem_requirements.alignment;
 
     var total_buffers_size: usize = 0;
-    for (app.shrd_mem_buffers.items) |shrd_mem| {
+    for (app.sm_buffers.items) |sm_buf| {
         try app.buffers_offsets.append(app.allocator, total_buffers_size);
-        total_buffers_size += std.mem.alignForward(usize, shrd_mem.size(), mem_alignment);
+        var next_offset = std.mem.alignForward(
+            usize,
+            sm_buf.size(),
+            mem_requirements.alignment,
+        );
+        next_offset = @max(next_offset, mem_requirements.size);
+        total_buffers_size += next_offset;
     }
 
     app.buffers_memory = try createDeviceMemory(
         app,
         .{
             .size = total_buffers_size,
-            .alignment = mem_alignment,
+            .alignment = mem_requirements.alignment,
             .memory_type_bits = mem_requirements.memory_type_bits
         },
         .{ .host_visible_bit = true, .host_coherent_bit = true },
     );
 
-    for (app.shrd_mem_buffers.items, app.buffers.items, app.buffers_offsets.items)
-        |shrd_mem, buf, offset| {
-        if (shrd_mem.data) |data| {
-            const data_slice = @as([*]const u8, @ptrCast(data))[0..shrd_mem.size()];
-
+    for (app.sm_buffers.items, app.buffers.items, app.buffers_offsets.items)
+        |sm_buf, buf, offset| {
+        if (sm_buf.data != null) {
             const mapped_memory = try mapMemory(
                 app,
                 app.buffers_memory,
                 offset,
-                shrd_mem.size()
+                sm_buf.size()
             );
-            @memcpy(mapped_memory, data_slice);
+            @memcpy(mapped_memory, sm_buf.dataAsSlice(u8));
             app.gpu.vkd.unmapMemory(app.gpu.device, app.buffers_memory);
         }
 
@@ -141,151 +144,183 @@ pub fn createBuffers(app: *App) !void {
         app.log(
             .debug,
             "Uploaded buffer [{}] (size: {d}) to GPU",
-            .{ shrd_mem.binding, shrd_mem.size() }
+            .{ sm_buf.binding, sm_buf.size() }
         );
     }
 }
 
 
 pub fn createImages(app: *App) !void {
-    if (app.shrd_mem_images.items.len == 0) {
+    if (app.sm_images2d.items.len == 0) {
         app.log(.debug, "No images found, skipping...", .{});
         return;
     }
 
-    var image: vk.Image = .null_handle;
-    var image_memory: vk.DeviceMemory = .null_handle;
+    for (app.sm_images2d.items) |sm_img| {
+        const img = sm_img;
+        const img_info = img.info.image_2d;
+        const image = try vkimg.createImage(
+            app,
+            img_info.width,
+            img_info.height,
+            img_info.toVulkanFormat(),
+            .optimal,
+            .{ .transfer_dst_bit = true, .transfer_src_bit = true, .storage_bit = true },
+        );
 
-    const img = app.shrd_mem_images.items[0];
-    const img_info = img.info.image_2d;
-    try vkimg.createImage(
-        app,
-        img_info.width,
-        img_info.height,
-        .r32g32b32a32_sfloat,
-        .optimal,
-        .{ .transfer_dst_bit = true, .transfer_src_bit = true, .storage_bit = true },
-        .{ .device_local_bit = true },
-        &image,
-        &image_memory,
-    );
+        try app.images.append(app.allocator, image);
+    }
 
-
-    const staging_buffer = try createBuffer(app, img.size(), .{
-        .transfer_src_bit = true,
-        .transfer_dst_bit = true,
-    });
-    const mem_requirements = app.gpu.vkd.getBufferMemoryRequirements(
+    // TODO: It's probably a good idea to split images into their own groups
+    // as different formats may have defferent requirements
+    // but for now it works ok I guess?
+    const img_mem_requirements = app.gpu.vkd.getImageMemoryRequirements(
         app.gpu.device,
-        staging_buffer
+        app.images.items[0],
     );
-    const staging_buffer_memory = try createDeviceMemory(
+
+    var total_buffers_device_size: usize = 0;
+    for (app.sm_images2d.items, app.images.items) |sm_img, image| {
+        const mem_req = app.gpu.vkd.getImageMemoryRequirements(
+            app.gpu.device,
+            image,
+        );
+
+        try app.images_buffers_offsets_device.append(app.allocator, total_buffers_device_size);
+        var next_offset = std.mem.alignForward(
+            usize,
+            sm_img.size(),
+            mem_req.alignment
+        );
+        next_offset = @max(next_offset, mem_req.size);
+        total_buffers_device_size += next_offset;
+    }
+
+    app.images_memory_device = try createDeviceMemory(
         app,
-        mem_requirements,
+        .{
+            .size = total_buffers_device_size,
+            .alignment = img_mem_requirements.alignment,
+            .memory_type_bits = img_mem_requirements.memory_type_bits
+        },
+        .{ .device_local_bit = true },
+    );
+
+    for (app.images.items, app.images_buffers_offsets_device.items) |image, offset| {
+        try app.gpu.vkd.bindImageMemory(
+            app.gpu.device,
+            image,
+            app.images_memory_device,
+            offset,
+        );
+    }
+
+    for (app.sm_images2d.items) |sm_img| {
+        const staging_buffer = try createBuffer(app, sm_img.size(), .{
+            .transfer_src_bit = true,
+            .transfer_dst_bit = true,
+        });
+        try app.images_buffers.append(app.allocator, staging_buffer);
+    }
+
+    const buf_mem_requirements = app.gpu.vkd.getBufferMemoryRequirements(
+        app.gpu.device,
+        app.images_buffers.items[0],
+    );
+
+    var total_buffers_host_size: usize = 0;
+    for (app.sm_images2d.items) |sm_img| {
+        try app.images_buffers_offsets_host.append(app.allocator, total_buffers_host_size);
+        total_buffers_host_size += std.mem.alignForward(
+            usize,
+            sm_img.size(),
+            buf_mem_requirements.alignment
+        );
+    }
+    total_buffers_host_size = @max(buf_mem_requirements.size, total_buffers_host_size);
+
+    app.images_memory_host = try createDeviceMemory(
+        app,
+        .{
+            .size = total_buffers_device_size,
+            .alignment = buf_mem_requirements.alignment,
+            .memory_type_bits = buf_mem_requirements.memory_type_bits
+        },
         .{ .host_visible_bit = true, .host_coherent_bit = true },
     );
 
-    defer {
-        app.gpu.vkd.destroyBuffer(app.gpu.device, staging_buffer, null);
-        app.gpu.vkd.freeMemory(app.gpu.device, staging_buffer_memory, null);
-    }
-
-    {
-        const mapped_memory = try mapMemory(
-            app,
-            staging_buffer_memory,
-            0,
-            img.size(),
+    for (app.images_buffers.items, app.images_buffers_offsets_host.items) |img_buf, offset| {
+        try app.gpu.vkd.bindBufferMemory(
+            app.gpu.device,
+            img_buf,
+            app.images_memory_host,
+            offset,
         );
-        @memset(mapped_memory, 255);
-        app.gpu.vkd.unmapMemory(app.gpu.device, staging_buffer_memory);
     }
 
-    try app.gpu.vkd.bindBufferMemory(
-        app.gpu.device,
-        staging_buffer,
-        staging_buffer_memory,
-        0
-    );
+    for (app.sm_images2d.items, app.images.items, app.images_buffers.items, app.images_buffers_offsets_host.items)
+        |sm_img, image, img_buf, offset| {
+        const img_info = sm_img.info.image_2d;
 
-    try app.images.append(app.allocator, image);
-    app.images_memory = image_memory;
+        if (sm_img.data != null) {
+            const mapped_memory = try mapMemory(
+                app,
+                app.images_memory_host,
+                offset,
+                sm_img.size(),
+            );
+            @memcpy(mapped_memory, sm_img.dataAsSlice(u8));
+            app.gpu.vkd.unmapMemory(app.gpu.device, app.images_memory_host);
+        }
 
-    try vkimg.transitionImageLayout(
-        app,
-        image,
-        .undefined,
-        .transfer_dst_optimal,
-    );
+        try vkimg.transitionImageLayout(
+            app,
+            image,
+            .undefined,
+            .transfer_dst_optimal,
+        );
 
-    try vkimg.copyBufferToImage(
-        app,
-        staging_buffer,
-        image,
-        img_info.width,
-        img_info.height
-    );
+        try vkimg.copyBufferToImage(
+            app,
+            img_buf,
+            image,
+            img_info.width,
+            img_info.height,
+        );
 
-    try vkimg.transitionImageLayout(
-        app,
-        image,
-        .transfer_dst_optimal,
-        .general,
-    );
+        try vkimg.transitionImageLayout(
+            app,
+            image,
+            .transfer_dst_optimal,
+            .general,
+        );
 
-    const image_view = try vkimg.createImageView(
-        app,
-        image,
-        .r32g32b32a32_sfloat
-    );
-    try app.images_views.append(app.allocator, image_view);
+        const image_view = try vkimg.createImageView(
+            app,
+            image,
+            img_info.toVulkanFormat(),
+        );
+        try app.images_views.append(app.allocator, image_view);
+    }
 }
 
-pub fn dbgReadImage(app: *const App) !void {
-    const img = app.shrd_mem_images.items[0];
+pub fn mapImage(app: *const App, img_index: usize) ![]u8 {
+    const img = app.sm_images2d.items[img_index];
     const img_info = img.info.image_2d;
-
-    const staging_buffer = try createBuffer(app, img.size(), .{
-        .transfer_src_bit = true,
-        .transfer_dst_bit = true,
-    });
-    const mem_requirements = app.gpu.vkd.getBufferMemoryRequirements(
-        app.gpu.device,
-        staging_buffer
-    );
-    const staging_buffer_memory = try createDeviceMemory(
-        app,
-        mem_requirements,
-        .{ .host_visible_bit = true, .host_coherent_bit = true },
-    );
-
-    defer {
-        app.gpu.vkd.destroyBuffer(app.gpu.device, staging_buffer, null);
-        app.gpu.vkd.freeMemory(app.gpu.device, staging_buffer_memory, null);
-    }
-
-    try app.gpu.vkd.bindBufferMemory(
-        app.gpu.device,
-        staging_buffer,
-        staging_buffer_memory,
-        0
-    );
 
     try vkimg.copyImageToBuffer(
         app,
-        staging_buffer,
-        app.images.items[0],
+        app.images_buffers.items[img_index],
+        app.images.items[img_index],
         img_info.width,
         img_info.height
     );
 
-    {
-        const mapped_memory2 = try mapMemory(
-            app,
-            staging_buffer_memory,
-            0,
-            img.size(),
-        );
-        std.debug.print("{any}\n", .{mapped_memory2});
-    }
+    return try mapMemory(
+        app,
+        app.images_memory_host,
+        app.images_buffers_offsets_host.items[img_index],
+        img.size(),
+    );
+    //defer app.gpu.vkd.unmapMemory(app.gpu.device, app.images_memory_host);
 }

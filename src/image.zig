@@ -13,10 +13,7 @@ pub fn createImage(
     format: vk.Format,
     tiling: vk.ImageTiling,
     usage: vk.ImageUsageFlags,
-    properties: vk.MemoryPropertyFlags,
-    image: *vk.Image,
-    image_memory: *vk.DeviceMemory,
-) !void {
+) !vk.Image {
     const image_create_info = vk.ImageCreateInfo{
         .image_type = .@"2d",
         .format = format,
@@ -34,28 +31,10 @@ pub fn createImage(
         .sharing_mode = .exclusive,
     };
 
-    image.* = try app.gpu.vkd.createImage(
+    return try app.gpu.vkd.createImage(
         app.gpu.device,
         &image_create_info,
         null,
-    );
-
-    const mem_requirements = app.gpu.vkd.getImageMemoryRequirements(
-        app.gpu.device,
-        image.*,
-    );
-
-    image_memory.* = try memory.createDeviceMemory(
-        app,
-        mem_requirements,
-        properties,
-    );
-
-    try app.gpu.vkd.bindImageMemory(
-        app.gpu.device,
-        image.*,
-        image_memory.*,
-        0,
     );
 }
 

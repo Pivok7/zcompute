@@ -18,5 +18,13 @@ void computeMain(uint3 threadID : SV_DispatchThreadID) {
     buf_one[id] = buf_one[id] + buf_one[id];
     buf_two[id] = buf_two[id] * buf_two[id];
     buf_three[id] = 1.0 / buf_three[id];
-    buf_four[uint2(0, 0)] = float4(0.0, 0.5, 1.0, 0.5);
+
+    for (uint i = 0; i < 2; i++) {
+	buf_four[uint2(id, i)] = float4(
+	    float(id),
+	    float(id),
+	    float(i),
+	    float(i),
+	);
+    }
 }
