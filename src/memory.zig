@@ -314,11 +314,24 @@ pub fn createImages(app: *App) !void {
     app.mapped_memory_images = mapped_memory;
 }
 
-pub fn mapImage(app: *const App, img_index: usize) !void {
+pub fn readImage(app: *const App, img_index: usize) !void {
     const img = app.sm_images_2d.items[img_index];
     const img_info = img.info.image_2d;
 
     try vkimg.copyImageToBuffer(
+        app,
+        app.images_buffers.items[img_index],
+        app.images.items[img_index],
+        img_info.width,
+        img_info.height
+    );
+}
+
+pub fn writeImage(app: *const App, img_index: usize) !void {
+    const img = app.sm_images_2d.items[img_index];
+    const img_info = img.info.image_2d;
+
+    try vkimg.copyBufferToImage(
         app,
         app.images_buffers.items[img_index],
         app.images.items[img_index],

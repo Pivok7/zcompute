@@ -59,12 +59,17 @@ pub fn main() !void {
     try app.submit();
 
     // Example of editing the memory
-    var sm1_memory = try app.getMemory(u32, 0);
-    sm1_memory[0] = 10;
+    var sm0_memory = try app.getMemory(u32, 0);
+    sm0_memory[0] = 10;
 
     // Run the application
     // Can be called many times
     try app.run();
+
+    // Editing image requires calling updateMemory
+    var sm4_memory = try app.getMemory(f32, 3);
+    sm4_memory[0] = 1.2;
+    try app.updateMemory(3);
 
     // Collect the output
     const one = try app.getMemory(u32, 0);

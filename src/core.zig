@@ -348,18 +348,22 @@ pub const VulkanApp = struct {
                         mapped_range = app.mapped_memory_buffers[
                             offset..(offset + data_len)
                         ];
+
+                        break;
                     }
                 }
             },
             .image_2d => {
                 for (app.sm_images_2d.items, 0..) |sm_img, i| {
                     if (sm_img.binding == binding) {
-                        try memory.mapImage(app, i);
+                        try memory.readImage(app, i);
                         const offset = app.images_buffers_offsets_host.items[i];
                         const data_len = sm.size();
                         mapped_range = app.mapped_memory_images[
                             offset..(offset + data_len)
                         ];
+
+                        break;
                     }
                 }
             }
@@ -368,6 +372,25 @@ pub const VulkanApp = struct {
         return @as([*]T, @alignCast(@ptrCast(mapped_range)))[
             0..sm.size() / @sizeOf(T)
         ];
+    }
+
+    pub fn updateMemory(app: *const Self, binding: u32) !void {
+        const index = try app.getBindingIndex(binding);
+        const sm = app.shared_memories.items[index];
+
+        switch (sm.info) {
+            .buffer => {
+                app.log(.warn, "Updating buffer is a no-op as it's host coherent", .{});
+            },
+            .image_2d => {
+                for (app.sm_images_2d.items, 0..) |sm_img, i| {
+                    if (sm_img.binding == binding) {
+                        try memory.writeImage(app, i);
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     // TODO: probably good idea to use hash map here
