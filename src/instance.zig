@@ -40,9 +40,13 @@ pub fn createInstance(gpu: *const GPU) !vk.Instance {
         .flags = .{},
         .p_application_info = &app_info,
         .enabled_layer_count = if (gpu.options.enable_validation_layers)
-            @intCast(validation_layers.len) else 0,
+            @intCast(validation_layers.len)
+        else
+            0,
         .pp_enabled_layer_names = if (gpu.options.enable_validation_layers)
-            @ptrCast(&validation_layers) else null,
+            @ptrCast(&validation_layers)
+        else
+            null,
         .enabled_extension_count = @intCast(required_extensions.len),
         .pp_enabled_extension_names = required_extensions.ptr,
     };
@@ -58,7 +62,10 @@ fn checkValidationLayerSupport(gpu: *const GPU) !void {
     const available_layers = try gpu.allocator.alloc(vk.LayerProperties, layer_count);
     defer gpu.allocator.free(available_layers);
 
-    result = try gpu.vkb.enumerateInstanceLayerProperties(&layer_count, @ptrCast(available_layers));
+    result = try gpu.vkb.enumerateInstanceLayerProperties(
+        &layer_count,
+        @ptrCast(available_layers),
+    );
     try vkAssesrt.withMessage(result, "Failed to enumerate instance layer properties.");
 
     // Print validation layers if debug mode is on

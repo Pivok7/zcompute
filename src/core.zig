@@ -15,8 +15,7 @@ pub const validation_layers = [_][*:0]const u8{
     "VK_LAYER_KHRONOS_validation",
 };
 
-pub const device_extensions = [_][*:0]const u8{
-};
+pub const device_extensions = [_][*:0]const u8{};
 
 pub const VkAssert = struct {
     pub fn basic(result: vk.Result) !void {
@@ -84,7 +83,9 @@ pub const VulkanGPU = struct {
         };
 
         dev.vulkan_lib = try loader.loadVulkan();
-        const vkGetInstanceProcAddr = try loader.loadVkGetInstanceProcAddr(&dev.vulkan_lib);
+        const vkGetInstanceProcAddr = try loader.loadVkGetInstanceProcAddr(
+            &dev.vulkan_lib,
+        );
         dev.log(.debug, "Loaded Vulkan library", .{});
 
         dev.vkb = vk.BaseWrapper.load(vkGetInstanceProcAddr);
@@ -94,14 +95,16 @@ pub const VulkanGPU = struct {
 
         dev.vki = vk.InstanceWrapper.load(
             dev.instance,
-            dev.vkb.dispatch.vkGetInstanceProcAddr.?
+            dev.vkb.dispatch.vkGetInstanceProcAddr.?,
         );
 
         dev.physical_device = try device.pickPhysicalDevice(&dev);
         dev.log(
             .info,
             "Device: {s}",
-            .{dev.vki.getPhysicalDeviceProperties(dev.physical_device).device_name}
+            .{dev.vki.getPhysicalDeviceProperties(
+                dev.physical_device,
+            ).device_name},
         );
 
         dev.device = try device.createLogicalDevice(&dev);
@@ -109,7 +112,7 @@ pub const VulkanGPU = struct {
 
         dev.vkd = vk.DeviceWrapper.load(
             dev.device,
-            dev.vki.dispatch.vkGetDeviceProcAddr.?
+            dev.vki.dispatch.vkGetDeviceProcAddr.?,
         );
 
         dev.compute_queue_index = try device.getComputeQueueIndex(&dev);
@@ -131,7 +134,7 @@ pub const VulkanGPU = struct {
         dev: *const Self,
         level: std.log.Level,
         comptime format: []const u8,
-        args: anytype
+        args: anytype,
     ) void {
         switch (level) {
             .debug => if (dev.options.debug_mode) {
@@ -244,9 +247,7 @@ pub const VulkanApp = struct {
             return error.NoShaderLoaded;
         }
 
-        var binding_set = std.AutoHashMap(u32, void).init(
-            app.allocator
-        );
+        var binding_set = std.AutoHashMap(u32, void).init(app.allocator);
         defer binding_set.deinit();
 
         for (app.shared_memories.items) |*sm| {
@@ -345,9 +346,7 @@ pub const VulkanApp = struct {
                     if (sm_buf.binding == binding) {
                         const offset = app.buffers_offsets.items[i];
                         const data_len = sm.size();
-                        mapped_range = app.mapped_memory_buffers[
-                            offset..(offset + data_len)
-                        ];
+                        mapped_range = app.mapped_memory_buffers[offset..(offset + data_len)];
 
                         break;
                     }
@@ -359,19 +358,15 @@ pub const VulkanApp = struct {
                         try memory.readImage(app, i);
                         const offset = app.images_buffers_offsets_host.items[i];
                         const data_len = sm.size();
-                        mapped_range = app.mapped_memory_images[
-                            offset..(offset + data_len)
-                        ];
+                        mapped_range = app.mapped_memory_images[offset..(offset + data_len)];
 
                         break;
                     }
                 }
-            }
+            },
         }
 
-        return @as([*]T, @alignCast(@ptrCast(mapped_range)))[
-            0..sm.size() / @sizeOf(T)
-        ];
+        return @as([*]T, @ptrCast(@alignCast(mapped_range)))[0 .. sm.size() / @sizeOf(T)];
     }
 
     pub fn updateMemory(app: *const Self, binding: u32) !void {
@@ -389,7 +384,7 @@ pub const VulkanApp = struct {
                         break;
                     }
                 }
-            }
+            },
         }
     }
 
@@ -417,7 +412,7 @@ pub const VulkanApp = struct {
         app: *const Self,
         level: std.log.Level,
         comptime format: []const u8,
-        args: anytype
+        args: anytype,
     ) void {
         switch (level) {
             .debug => if (app.options.debug_mode) {

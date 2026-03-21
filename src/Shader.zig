@@ -35,7 +35,7 @@ pub fn deinit(
 
 fn createShaderModuleFromFilePath(
     app: *const App,
-    file_path: []const u8
+    file_path: []const u8,
 ) !vk.ShaderModule {
     var file = try std.fs.cwd().openFile(file_path, .{});
     defer file.close();
@@ -59,6 +59,6 @@ fn createShaderModule(app: *const App, code: []const u8) !vk.ShaderModule {
     return try app.gpu.vkd.createShaderModule(
         app.gpu.device,
         &create_info,
-        null
+        null,
     );
 }

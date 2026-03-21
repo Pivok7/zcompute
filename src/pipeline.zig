@@ -31,7 +31,7 @@ pub fn createDescriptorSetLayout(app: *const App) !vk.DescriptorSetLayout {
     return try app.gpu.vkd.createDescriptorSetLayout(
         app.gpu.device,
         &create_info,
-        null
+        null,
     );
 }
 
@@ -80,16 +80,13 @@ pub fn createPipeline(app: *const App) !vk.Pipeline {
 }
 
 pub fn createDescriptorPool(app: *const App) !vk.DescriptorPool {
-    const pool_sizes = [_]vk.DescriptorPoolSize{
-        .{
-            .type = .storage_buffer,
-            .descriptor_count = @intCast(app.sm_buffers.items.len),
-        },
-        .{
-            .type = .storage_image,
-            .descriptor_count = @intCast(app.sm_images_2d.items.len),
-        }
-    };
+    const pool_sizes = [_]vk.DescriptorPoolSize{ .{
+        .type = .storage_buffer,
+        .descriptor_count = @intCast(app.sm_buffers.items.len),
+    }, .{
+        .type = .storage_image,
+        .descriptor_count = @intCast(app.sm_images_2d.items.len),
+    } };
 
     const create_info = vk.DescriptorPoolCreateInfo{
         .pool_size_count = pool_sizes.len,
@@ -112,16 +109,13 @@ pub fn createDescriptorSets(app: *const App) !vk.DescriptorSet {
     try app.gpu.vkd.allocateDescriptorSets(
         app.gpu.device,
         &allocate_info,
-        @ptrCast(&descriptor_set)
+        @ptrCast(&descriptor_set),
     );
 
     var buffer_infos: std.ArrayList(vk.DescriptorBufferInfo) = .empty;
     defer buffer_infos.deinit(app.allocator);
 
-    for (
-        app.buffers.items,
-        app.sm_buffers.items
-    ) |buffer, sm_buf| {
+    for (app.buffers.items, app.sm_buffers.items) |buffer, sm_buf| {
         try buffer_infos.append(app.allocator, .{
             .buffer = buffer,
             .offset = 0,
@@ -143,10 +137,7 @@ pub fn createDescriptorSets(app: *const App) !vk.DescriptorSet {
     var write_descriptor_sets: std.ArrayList(vk.WriteDescriptorSet) = .empty;
     defer write_descriptor_sets.deinit(app.allocator);
 
-    for (
-        buffer_infos.items,
-        app.sm_buffers.items
-    ) |*buffer_info, sm_buf| {
+    for (buffer_infos.items, app.sm_buffers.items) |*buffer_info, sm_buf| {
         try write_descriptor_sets.append(app.allocator, .{
             .dst_set = descriptor_set,
             .dst_binding = sm_buf.binding,
@@ -159,10 +150,7 @@ pub fn createDescriptorSets(app: *const App) !vk.DescriptorSet {
         });
     }
 
-    for (
-        images_infos.items,
-        app.sm_images_2d.items
-    ) |*img_info, sm_img| {
+    for (images_infos.items, app.sm_images_2d.items) |*img_info, sm_img| {
         try write_descriptor_sets.append(app.allocator, .{
             .dst_set = descriptor_set,
             .dst_binding = sm_img.binding,
@@ -180,7 +168,7 @@ pub fn createDescriptorSets(app: *const App) !vk.DescriptorSet {
         @intCast(write_descriptor_sets.items.len),
         @ptrCast(write_descriptor_sets.items.ptr),
         0,
-        null
+        null,
     );
 
     return descriptor_set;

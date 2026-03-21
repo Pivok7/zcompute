@@ -20,15 +20,16 @@ fn createBuffer(app: *const App, size: usize, usage: vk.BufferUsageFlags) !vk.Bu
 fn findMemoryType(
     app: *const App,
     mem_type_bits: u32,
-    properties: vk.MemoryPropertyFlags
+    properties: vk.MemoryPropertyFlags,
 ) ?u32 {
-    const mem_props = app.gpu.vki.getPhysicalDeviceMemoryProperties(app.gpu.physical_device);
+    const mem_props = app.gpu.vki.getPhysicalDeviceMemoryProperties(
+        app.gpu.physical_device,
+    );
 
     for (0..mem_props.memory_type_count) |i| {
-        if (
-            (mem_type_bits & (@as(u32, 1) << @intCast(i)) != 0) and
-            (mem_props.memory_types[i].property_flags.contains(properties))
-        ) {
+        if ((mem_type_bits & (@as(u32, 1) << @intCast(i)) != 0) and
+            (mem_props.memory_types[i].property_flags.contains(properties)))
+        {
             return @intCast(i);
         }
     }
@@ -44,7 +45,7 @@ pub fn createDeviceMemory(
     const suitable_memory_type = findMemoryType(
         app,
         mem_requirements.memory_type_bits,
-        properties
+        properties,
     ) orelse {
         std.log.err("Failed to find suitable memory type for buffer", .{});
         return error.NoSuitableMemoryType;
@@ -55,18 +56,14 @@ pub fn createDeviceMemory(
         .memory_type_index = suitable_memory_type,
     };
 
-    return try app.gpu.vkd.allocateMemory(
-        app.gpu.device,
-        &memory_allocate_info,
-        null
-    );
+    return try app.gpu.vkd.allocateMemory(app.gpu.device, &memory_allocate_info, null);
 }
 
 pub fn mapMemory(
     app: *const App,
     device_memory: vk.DeviceMemory,
     offset: vk.DeviceSize,
-    size: vk.DeviceSize
+    size: vk.DeviceSize,
 ) ![]u8 {
     const buffer_opaque = try app.gpu.vkd.mapMemory(
         app.gpu.device,
@@ -88,16 +85,18 @@ pub fn createBuffers(app: *App) !void {
     }
 
     for (app.sm_buffers.items) |sm_buf| {
-        const buffer = try createBuffer(app, sm_buf.size(), .{ .storage_buffer_bit = true });
+        const buffer = try createBuffer(
+            app,
+            sm_buf.size(),
+            .{ .storage_buffer_bit = true },
+        );
         try app.buffers.append(app.allocator, buffer);
     }
 
-    const mem_requirements = app.gpu.vkd.getBufferMemoryRequirements(
-        app.gpu.device,
+    const mem_requirements = app.gpu.vkd.getBufferMemoryRequirements(app.gpu.device,
         // We can grab the first one as all of them
         // have the same create info
-        app.buffers.items[0]
-    );
+        app.buffers.items[0]);
 
     var total_buffers_size: usize = 0;
     for (app.sm_buffers.items) |sm_buf| {
@@ -116,7 +115,7 @@ pub fn createBuffers(app: *App) !void {
         .{
             .size = total_buffers_size,
             .alignment = mem_requirements.alignment,
-            .memory_type_bits = mem_requirements.memory_type_bits
+            .memory_type_bits = mem_requirements.memory_type_bits,
         },
         .{ .host_visible_bit = true, .host_coherent_bit = true },
     );
@@ -128,30 +127,27 @@ pub fn createBuffers(app: *App) !void {
         total_buffers_size,
     );
 
-    for (app.sm_buffers.items, app.buffers.items, app.buffers_offsets.items)
-        |sm_buf, buf, offset| {
+    for (
+        app.sm_buffers.items,
+        app.buffers.items,
+        app.buffers_offsets.items,
+    ) |sm_buf, buf, offset| {
         if (sm_buf.data != null) {
             const data = sm_buf.dataAsSlice(u8);
             @memcpy(mapped_memory[offset..(offset + data.len)], data);
         }
 
-        try app.gpu.vkd.bindBufferMemory(
-            app.gpu.device,
-            buf,
-            app.buffers_memory,
-            offset
-        );
+        try app.gpu.vkd.bindBufferMemory(app.gpu.device, buf, app.buffers_memory, offset);
 
         app.log(
             .debug,
             "Uploaded buffer [{}] (size: {d}) to GPU",
-            .{ sm_buf.binding, sm_buf.size() }
+            .{ sm_buf.binding, sm_buf.size() },
         );
     }
 
     app.mapped_memory_buffers = mapped_memory;
 }
-
 
 pub fn createImages(app: *App) !void {
     if (app.sm_images_2d.items.len == 0) {
@@ -189,12 +185,11 @@ pub fn createImages(app: *App) !void {
             image,
         );
 
-        try app.images_buffers_offsets_device.append(app.allocator, total_buffers_device_size);
-        var next_offset = std.mem.alignForward(
-            usize,
-            sm_img.size(),
-            mem_req.alignment
+        try app.images_buffers_offsets_device.append(
+            app.allocator,
+            total_buffers_device_size,
         );
+        var next_offset = std.mem.alignForward(usize, sm_img.size(), mem_req.alignment);
         next_offset = @max(next_offset, mem_req.size);
         total_buffers_device_size += next_offset;
     }
@@ -204,7 +199,7 @@ pub fn createImages(app: *App) !void {
         .{
             .size = total_buffers_device_size,
             .alignment = img_mem_requirements.alignment,
-            .memory_type_bits = img_mem_requirements.memory_type_bits
+            .memory_type_bits = img_mem_requirements.memory_type_bits,
         },
         .{ .device_local_bit = true },
     );
@@ -233,11 +228,14 @@ pub fn createImages(app: *App) !void {
 
     var total_buffers_host_size: usize = 0;
     for (app.sm_images_2d.items) |sm_img| {
-        try app.images_buffers_offsets_host.append(app.allocator, total_buffers_host_size);
+        try app.images_buffers_offsets_host.append(
+            app.allocator,
+            total_buffers_host_size,
+        );
         total_buffers_host_size += std.mem.alignForward(
             usize,
             sm_img.size(),
-            buf_mem_requirements.alignment
+            buf_mem_requirements.alignment,
         );
     }
     total_buffers_host_size = @max(buf_mem_requirements.size, total_buffers_host_size);
@@ -247,12 +245,15 @@ pub fn createImages(app: *App) !void {
         .{
             .size = total_buffers_device_size,
             .alignment = buf_mem_requirements.alignment,
-            .memory_type_bits = buf_mem_requirements.memory_type_bits
+            .memory_type_bits = buf_mem_requirements.memory_type_bits,
         },
         .{ .host_visible_bit = true, .host_coherent_bit = true },
     );
 
-    for (app.images_buffers.items, app.images_buffers_offsets_host.items) |img_buf, offset| {
+    for (
+        app.images_buffers.items,
+        app.images_buffers_offsets_host.items,
+    ) |img_buf, offset| {
         try app.gpu.vkd.bindBufferMemory(
             app.gpu.device,
             img_buf,
@@ -272,7 +273,7 @@ pub fn createImages(app: *App) !void {
         app.sm_images_2d.items,
         app.images.items,
         app.images_buffers.items,
-        app.images_buffers_offsets_host.items
+        app.images_buffers_offsets_host.items,
     ) |sm_img, image, img_buf, offset| {
         const img_info = sm_img.info.image_2d;
 
@@ -323,7 +324,7 @@ pub fn readImage(app: *const App, img_index: usize) !void {
         app.images_buffers.items[img_index],
         app.images.items[img_index],
         img_info.width,
-        img_info.height
+        img_info.height,
     );
 }
 
@@ -336,6 +337,6 @@ pub fn writeImage(app: *const App, img_index: usize) !void {
         app.images_buffers.items[img_index],
         app.images.items[img_index],
         img_info.width,
-        img_info.height
+        img_info.height,
     );
 }

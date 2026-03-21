@@ -38,7 +38,11 @@ pub fn createImage(
     );
 }
 
-pub fn createImageView(app: *App, image: vk.Image, format: vk.Format) !vk.ImageView {
+pub fn createImageView(
+    app: *App,
+    image: vk.Image,
+    format: vk.Format,
+) !vk.ImageView {
     const image_view_create_info = vk.ImageViewCreateInfo{
         .image = image,
         .view_type = .@"2d",
@@ -61,7 +65,7 @@ pub fn createImageView(app: *App, image: vk.Image, format: vk.Format) !vk.ImageV
     return app.gpu.vkd.createImageView(
         app.gpu.device,
         &image_view_create_info,
-        null
+        null,
     );
 }
 
@@ -98,13 +102,11 @@ pub fn transitionImageLayout(
         barrier1.dst_access_mask = .{ .transfer_write_bit = true };
         src_stage_mask = .{ .top_of_pipe_bit = true };
         dst_stage_mask = .{ .transfer_bit = true };
-
     } else if (old_layout == .transfer_dst_optimal and new_layout == .general) {
         barrier1.src_access_mask = .{ .transfer_write_bit = true };
-        barrier1.dst_access_mask = .{ .shader_write_bit = true, .shader_read_bit = true };
+        barrier1.dst_access_mask = .{ .shader_write_bit = true, .shader_read_bit = true, };
         src_stage_mask = .{ .transfer_bit = true };
         dst_stage_mask = .{ .compute_shader_bit = true };
-
     } else {
         std.log.err("Invalid layout transition", .{});
         return error.InvalidLayoutTransition;

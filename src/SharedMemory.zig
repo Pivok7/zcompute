@@ -32,7 +32,7 @@ pub fn elem_size(self: *const Self) usize {
 }
 
 pub fn dataAsSlice(self: *const Self, T: type) []const T {
-    return @as([*]const T, @alignCast(@ptrCast(self.data)))[0..self.size()];
+    return @as([*]const T, @ptrCast(@alignCast(self.data)))[0..self.size()];
 }
 
 pub const Buffer = struct {

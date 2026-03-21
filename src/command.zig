@@ -28,7 +28,10 @@ pub fn beginSingleTimeCommands(app: *const App) !vk.CommandBuffer {
     return command_buffer;
 }
 
-pub fn endSingleTimeCommands(app: *const App, command_buffer: vk.CommandBuffer) !void {
+pub fn endSingleTimeCommands(
+    app: *const App,
+    command_buffer: vk.CommandBuffer,
+) !void {
     try app.gpu.vkd.endCommandBuffer(command_buffer);
 
     const queue_submit_info = vk.SubmitInfo{
@@ -54,7 +57,7 @@ pub fn createCommandPool(app: *const App) !vk.CommandPool {
     return try app.gpu.vkd.createCommandPool(
         app.gpu.device,
         @ptrCast(&create_info),
-        null
+        null,
     );
 }
 
@@ -70,7 +73,7 @@ pub fn createCommandBuffer(app: *const App) !vk.CommandBuffer {
     try app.gpu.vkd.allocateCommandBuffers(
         app.gpu.device,
         @ptrCast(&allocate_info),
-        @ptrCast(&command_buffer)
+        @ptrCast(&command_buffer),
     );
 
     try app.gpu.vkd.beginCommandBuffer(command_buffer, &.{});
@@ -83,13 +86,13 @@ pub fn createCommandBuffer(app: *const App) !vk.CommandBuffer {
         1,
         @ptrCast(&app.descriptor_set),
         0,
-        null
+        null,
     );
     app.gpu.vkd.cmdDispatch(
         command_buffer,
         @intCast(app.shader.?.dispatch.x),
         @intCast(app.shader.?.dispatch.y),
-        @intCast(app.shader.?.dispatch.z)
+        @intCast(app.shader.?.dispatch.z),
     );
     try app.gpu.vkd.endCommandBuffer(command_buffer);
 
@@ -101,7 +104,7 @@ pub fn submitWork(app: *const App) !void {
     const fence = try app.gpu.vkd.createFence(
         app.gpu.device,
         @ptrCast(&fence_create_info),
-        null
+        null,
     );
 
     const submit_info = vk.SubmitInfo{
@@ -109,7 +112,12 @@ pub fn submitWork(app: *const App) !void {
         .p_command_buffers = @ptrCast(&app.command_buffer),
     };
 
-    try app.gpu.vkd.queueSubmit(app.gpu.compute_queue, 1, @ptrCast(&submit_info), fence);
+    try app.gpu.vkd.queueSubmit(
+        app.gpu.compute_queue,
+        1,
+        @ptrCast(&submit_info),
+        fence,
+    );
     const result = try app.gpu.vkd.waitForFences(
         app.gpu.device,
         1,
