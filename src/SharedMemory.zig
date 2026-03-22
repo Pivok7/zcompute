@@ -79,9 +79,13 @@ pub const Buffer = struct {
 };
 
 pub const Image2d = struct {
-    pub const Format = enum {
-        r32g32b32a32_sfloat,
-        //r8g8b8a8_uint,
+    pub const Format = enum(i32) {
+        r32g32b32a32_sfloat = @intFromEnum(vk.Format.r32g32b32a32_sfloat),
+        //r8g8b8a8_uint = @intFromEnum(vk.Format.r8g8b8a8_uint),
+
+        pub fn toVulkan(self: @This()) vk.Format {
+            return @enumFromInt(@intFromEnum(self));
+        }
     };
 
     width: u32,
@@ -100,16 +104,9 @@ pub const Image2d = struct {
         };
     }
 
-    pub fn toVulkanFormat(self: *const @This()) vk.Format {
-        return switch (self.format) {
-            .r32g32b32a32_sfloat => .r32g32b32a32_sfloat,
-            //.r8g8b8a8_uint => .r8g8b8a8_uint,
-        };
-    }
-
     /// Create Image2d with undefined data.
     /// It doesn't allocate any memory.
-    pub fn newEmpty(width: u32, height: u32, format: Format) !Self {
+    pub fn newEmpty(format: Format, width: u32, height: u32) !Self {
         if (width == 0) return error.WidthTooShort;
         if (height == 0) return error.HeightTooShort;
 

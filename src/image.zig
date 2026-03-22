@@ -132,6 +132,7 @@ pub fn copyBufferToImage(
     app: *const App,
     buffer: vk.Buffer,
     image: vk.Image,
+    image_layout: vk.ImageLayout,
     width: u32,
     height: u32,
 ) !void {
@@ -159,7 +160,7 @@ pub fn copyBufferToImage(
         command_buffer,
         buffer,
         image,
-        .transfer_dst_optimal,
+        image_layout,
         1,
         @ptrCast(&region),
     );
@@ -171,6 +172,7 @@ pub fn copyImageToBuffer(
     app: *const App,
     buffer: vk.Buffer,
     image: vk.Image,
+    image_layout: vk.ImageLayout,
     width: u32,
     height: u32,
 ) !void {
@@ -197,7 +199,7 @@ pub fn copyImageToBuffer(
     app.gpu.vkd.cmdCopyImageToBuffer(
         command_buffer,
         image,
-        .general,
+        image_layout,
         buffer,
         1,
         @ptrCast(&region),

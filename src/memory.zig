@@ -162,7 +162,7 @@ pub fn createImages(app: *App) !void {
             app,
             img_info.width,
             img_info.height,
-            img_info.toVulkanFormat(),
+            img_info.format.toVulkan(),
             .optimal,
             .{ .transfer_dst_bit = true, .transfer_src_bit = true, .storage_bit = true },
         );
@@ -293,6 +293,7 @@ pub fn createImages(app: *App) !void {
             app,
             img_buf,
             image,
+            .transfer_dst_optimal,
             img_info.width,
             img_info.height,
         );
@@ -307,7 +308,7 @@ pub fn createImages(app: *App) !void {
         const image_view = try vkimg.createImageView(
             app,
             image,
-            img_info.toVulkanFormat(),
+            img_info.format.toVulkan(),
         );
         try app.images_views.append(app.allocator, image_view);
     }
@@ -323,6 +324,7 @@ pub fn readImage(app: *const App, img_index: usize) !void {
         app,
         app.images_buffers.items[img_index],
         app.images.items[img_index],
+        .general,
         img_info.width,
         img_info.height,
     );
@@ -336,6 +338,7 @@ pub fn writeImage(app: *const App, img_index: usize) !void {
         app,
         app.images_buffers.items[img_index],
         app.images.items[img_index],
+        .general,
         img_info.width,
         img_info.height,
     );

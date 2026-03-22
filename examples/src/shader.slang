@@ -8,6 +8,7 @@ RWStructuredBuffer<float32_t> buf_two;
 RWStructuredBuffer<float64_t> buf_three;
 
 [[vk::binding(3)]]
+[vk::image_format("rgba32f")]
 RWTexture2D<float4> buf_four;
 
 [shader("compute")]
@@ -20,11 +21,11 @@ void computeMain(uint3 threadID : SV_DispatchThreadID) {
     buf_three[id] = 1.0 / buf_three[id];
 
     for (uint i = 0; i < 2; i++) {
-	buf_four[uint2(id, i)] = float4(
+	buf_four.Store(uint2(id, i), float4(
 	    float(id),
 	    float(id),
 	    float(i),
 	    float(i),
-	);
+	));
     }
 }
